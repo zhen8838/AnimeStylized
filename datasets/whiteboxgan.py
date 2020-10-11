@@ -100,9 +100,10 @@ class AnimeGanDataSet(Dataset):
     return d
 
   def do_totensor(self, d: dict):
+    """ 只转换通道，不缩小数据尺度 """
     if self.totenor:
       for k, v in d.items():
-        d[k] = tf.to_tensor(v)
+        d[k] = torch.from_numpy(v.transpose((2, 0, 1))).float()
     return d
 
   def process_train(self, real_path, anime_path, anime_smooth_path) -> Dict[str, torch.Tensor]:
@@ -126,20 +127,33 @@ class AnimeGanDataSet(Dataset):
 
 
 class WhiteBoxGanDataModule(pl.LightningDataModule):
-  def __init__(self, root: str, style: str, batch_size: int = 8, num_workers: int = 4):
+  def __init__(self, root: str, style: str, batch_size: int = 8, num_workers: int = 4,
+               augment=True, normalize=True, totenor=True):
     super().__init__()
     self.root = root
     self.style = style
     self.batch_size = batch_size
     self.num_workers = num_workers
+    self.augment = augment
+    self.normalize = normalize
+    self.totenor = totenor
     self.dims = (3, 256, 256)
 
   def setup(self, stage=None):
     if stage == 'fit':
-      self.ds_train = AnimeGanDataSet(self.root, self.style, train=True)
-      self.ds_val = AnimeGanDataSet(self.root, self.style, train=False)
+      self.ds_train = AnimeGanDataSet(self.root, self.style, train=True,
+                                      augment=self.augment,
+                                      normalize=self.normalize,
+                                      totenor=self.totenor)
+      self.ds_val = AnimeGanDataSet(self.root, self.style, train=False,
+                                    augment=self.augment,
+                                    normalize=self.normalize,
+                                    totenor=self.totenor)
     else:
-      self.ds_test = AnimeGanDataSet(self.root, self.style, train=False)
+      self.ds_test = AnimeGanDataSet(self.root, self.style, train=False,
+                                     augment=self.augment,
+                                     normalize=self.normalize,
+                                     totenor=self.totenor)
 
   def train_dataloader(self):
     return DataLoader(self.ds_train, batch_size=self.batch_size, num_workers=self.num_workers)

@@ -108,13 +108,14 @@ class GAN(pl.LightningModule):
       b1: float = 0.5,
       b2: float = 0.99,
       pre_trained_ckpt: str = None,
+      normalize: bool = False,
       **kwargs
   ):
     super().__init__()
     self.save_hyperparameters()
 
     # networks
-    self.generator = UnetGenerator()
+    self.generator = UnetGenerator(normalize)
     if pre_trained_ckpt:
       ckpt = torch.load(pre_trained_ckpt)
       generatordict = dict(filter(lambda k: 'generator' in k[0], ckpt['state_dict'].items()))
@@ -129,7 +130,7 @@ class GAN(pl.LightningModule):
     self.guided_filter = GuidedFilter()
     self.lsgan_loss = LSGanLoss()
     self.colorshift = ColorShift()
-    self.pretrained = VGGPreTrained()
+    self.pretrained = VGGPreTrained(normalize)
     self.pretrained.freeze()
     self.l1_loss = nn.L1Loss('mean')
 
@@ -180,9 +181,6 @@ class GAN(pl.LightningModule):
       g_loss_gray = self.lsgan_loss._forward_g_loss(gray_real_logit, gray_fake_logit)
       g_loss_blur = self.lsgan_loss._forward_g_loss(blur_real_logit, blur_fake_logit)
 
-      # d_loss_gray, g_loss_gray = self.gan_disc_loss(self.disc_gray, gray_cartoon, gray_fake)
-      # d_loss_blur, g_loss_blur = self.gan_disc_loss(self.disc_blur, blur_cartoon, blur_fake)
-
       vgg_photo = self.pretrained(input_photo)
       vgg_output = self.pretrained(output)
       vgg_superpixel = self.pretrained(self.step_input_superpixel)
@@ -221,10 +219,16 @@ class GAN(pl.LightningModule):
         generator_img_show = torchvision.utils.make_grid(generator_img[:4], nrow=4)
         output_show = torchvision.utils.make_grid(output[:4], nrow=4)
         input_cartoon_show = torchvision.utils.make_grid(input_cartoon[:4], nrow=4)
-        input_photo_show = denormalize(input_photo_show)
-        generator_img_show = denormalize(generator_img_show)
-        output_show = denormalize(output_show)
-        input_cartoon_show = denormalize(input_cartoon_show)
+        if self.hparams.normalize:
+          input_photo_show = denormalize(input_photo_show)
+          generator_img_show = denormalize(generator_img_show)
+          output_show = denormalize(output_show)
+          input_cartoon_show = denormalize(input_cartoon_show)
+        else:
+          input_photo_show = input_photo_show.byte()
+          generator_img_show = generator_img_show.byte()
+          output_show = output_show.byte()
+          input_cartoon_show = input_cartoon_show.byte()
 
         tb: SummaryWriter = self.logger.experiment
         tb.add_image('input_photo', input_photo_show, batch_idx)

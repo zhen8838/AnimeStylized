@@ -20,15 +20,16 @@ class GAN(pl.LightningModule):
       lr: float = 2e-4,
       b1: float = 0.5,
       b2: float = 0.99,
+      normalize: bool = False,
       **kwargs
   ):
     super().__init__()
     self.save_hyperparameters()
 
     # networks
-    self.generator = UnetGenerator()
+    self.generator = UnetGenerator(normalize)
     self.l1_loss = nn.L1Loss('mean')
-    self.pretrained = VGGPreTrained()
+    self.pretrained = VGGPreTrained(normalize)
     self.pretrained.freeze()
 
   def forward(self, im):
@@ -59,9 +60,12 @@ class GAN(pl.LightningModule):
     if batch_idx % 50 == 0:
       input_photo_show = torchvision.utils.make_grid(input_photo[:4], nrow=4)
       generator_img_show = torchvision.utils.make_grid(generator_img[:4], nrow=4)
-      input_photo_show = denormalize(input_photo_show)
-      generator_img_show = denormalize(generator_img_show)
-
+      if self.hparams.normalize:
+        input_photo_show = denormalize(input_photo_show)
+        generator_img_show = denormalize(generator_img_show)
+      else:
+        input_photo_show = input_photo_show.byte()
+        generator_img_show = generator_img_show.byte()
       tb: SummaryWriter = self.logger.experiment
       tb.add_image('input_photo', input_photo_show, batch_idx)
       tb.add_image('generator_img', generator_img_show, batch_idx)

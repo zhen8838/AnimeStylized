@@ -5,7 +5,7 @@ import pytorch_lightning as pl
 from networks.whiteboxgan import SpectNormDiscriminator, UnetGenerator, VGGPreTrained
 from datasets.whiteboxgan import WhiteBoxGanDataModule, denormalize
 from losses.gan_loss import LSGanLoss
-from typing import Dict, List
+from typing import Dict, List, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as nf
@@ -78,25 +78,27 @@ class GuidedFilter(nn.Module):
 
 class ColorShift(nn.Module):
   def __init__(self, mode='uniform'):
+    # TODO 输入图像归一化[-1~1]之间，灰度化均值应该同样进行修改
+    # FIXME 原论文叙述中的alpha没有在代码中出现？
     super().__init__()
     self.dist: Distribution = None
     self.mode = mode
 
-    # self.dist:torch.distributions. = dist
-
   def setup(self, device: torch.device):
+    # NOTE 原论文输入的bgr图像，此处需要改为rgb
     if self.mode == 'normal':
       self.dist = torch.distributions.Normal(
           torch.tensor((0.299, 0.587, 0.114), device=device),
           torch.tensor((0.1, 0.1, 0.1), device=device))
     elif self.mode == 'uniform':
       self.dist = torch.distributions.Uniform(
-          torch.tensor((0.014, 0.487, 0.199), device=device),
-          torch.tensor((0.214, 0.687, 0.399), device=device))
+          torch.tensor((0.199, 0.487, 0.014), device=device),
+          torch.tensor((0.399, 0.687, 0.214), device=device))
 
-  def forward(self, img: torch.Tensor):
+  def forward(self, *img: torch.Tensor):
     rgb = self.dist.sample()
-    return img * rgb[None, :, None, None]
+    # img * rgb[None, :, None, None]
+    return ((im * rgb[None, :, None, None]) / rgb.sum() for im in img)
 
 
 class GAN(pl.LightningModule):
@@ -108,14 +110,13 @@ class GAN(pl.LightningModule):
       b1: float = 0.5,
       b2: float = 0.99,
       pre_trained_ckpt: str = None,
-      normalize: bool = False,
       **kwargs
   ):
     super().__init__()
     self.save_hyperparameters()
 
     # networks
-    self.generator = UnetGenerator(normalize)
+    self.generator = UnetGenerator()
     if pre_trained_ckpt:
       ckpt = torch.load(pre_trained_ckpt)
       generatordict = dict(filter(lambda k: 'generator' in k[0], ckpt['state_dict'].items()))
@@ -130,7 +131,7 @@ class GAN(pl.LightningModule):
     self.guided_filter = GuidedFilter()
     self.lsgan_loss = LSGanLoss()
     self.colorshift = ColorShift()
-    self.pretrained = VGGPreTrained(normalize)
+    self.pretrained = VGGPreTrained()
     self.pretrained.freeze()
     self.l1_loss = nn.L1Loss('mean')
 
@@ -173,9 +174,8 @@ class GAN(pl.LightningModule):
       output = self.guided_filter(input_photo, generator_img, r=1)
       blur_fake = self.guided_filter(output, output, r=5, eps=2e-1)
       blur_cartoon = self.guided_filter(input_cartoon, input_cartoon, r=5, eps=2e-1)
-
-      gray_fake = self.colorshift(output)
-      gray_cartoon = self.colorshift(input_cartoon)
+      # FIXME 原论文叙述的colorshift接受的应该是generator_img输入，但是代码中是经过滤波的输出
+      gray_fake, gray_cartoon = self.colorshift(output, input_cartoon)
       gray_real_logit, gray_fake_logit = self.do_disc(self.disc_gray, gray_cartoon, gray_fake)
       blur_real_logit, blur_fake_logit = self.do_disc(self.disc_blur, blur_cartoon, blur_fake)
       g_loss_gray = self.lsgan_loss._forward_g_loss(gray_real_logit, gray_fake_logit)
@@ -195,46 +195,35 @@ class GAN(pl.LightningModule):
                      'g_loss_blur': 1e-1 * g_loss_blur,
                      'g_loss_gray': g_loss_gray,
                      'recon_loss': 2e2 * recon_loss})
+      if batch_idx % 50 == 0:
+        self.log_images({'input': input_photo,
+                         'generate': generator_img,
+                         'output': output,
+                         'blur_fake': blur_fake,
+                         'blur_cartoon': blur_cartoon,
+                         'gray_fake': gray_fake,
+                         'gray_cartoon': gray_cartoon,
+                         'superpixel': self.step_input_superpixel})
+
       return g_loss_total
     elif optimizer_idx == 2:  # train discriminator
       generator_img = self.generator(input_photo)
       output = self.guided_filter(input_photo, generator_img, r=1)
+      # NOTE blur_fake and blur_cartoon for Surface loss
       blur_fake = self.guided_filter(output, output, r=5, eps=2e-1)
       blur_cartoon = self.guided_filter(input_cartoon, input_cartoon, r=5, eps=2e-1)
-
-      gray_fake = self.colorshift(output)
-      gray_cartoon = self.colorshift(input_cartoon)
-      gray_real_logit, gray_fake_logit = self.do_disc(self.disc_gray, gray_cartoon, gray_fake)
       blur_real_logit, blur_fake_logit = self.do_disc(self.disc_blur, blur_cartoon, blur_fake)
-      d_loss_gray = self.lsgan_loss._forward_d_loss(gray_real_logit, gray_fake_logit)
       d_loss_blur = self.lsgan_loss._forward_d_loss(blur_real_logit, blur_fake_logit)
+
+      # NOTE blur_fake and blur_cartoon for Textural loss
+      gray_fake, gray_cartoon = self.colorshift(output, input_cartoon)
+      gray_real_logit, gray_fake_logit = self.do_disc(self.disc_gray, gray_cartoon, gray_fake)
+      d_loss_gray = self.lsgan_loss._forward_d_loss(gray_real_logit, gray_fake_logit)
       d_loss_total = d_loss_blur + d_loss_gray
 
       self.log_dict({'d_loss': d_loss_total,
                      'd_loss_blur': d_loss_blur,
                      'd_loss_gray': d_loss_gray})
-
-      if batch_idx % 50 == 0:
-        input_photo_show = torchvision.utils.make_grid(input_photo[:4], nrow=4)
-        generator_img_show = torchvision.utils.make_grid(generator_img[:4], nrow=4)
-        output_show = torchvision.utils.make_grid(output[:4], nrow=4)
-        input_cartoon_show = torchvision.utils.make_grid(input_cartoon[:4], nrow=4)
-        if self.hparams.normalize:
-          input_photo_show = denormalize(input_photo_show)
-          generator_img_show = denormalize(generator_img_show)
-          output_show = denormalize(output_show)
-          input_cartoon_show = denormalize(input_cartoon_show)
-        else:
-          input_photo_show = input_photo_show.byte()
-          generator_img_show = generator_img_show.byte()
-          output_show = output_show.byte()
-          input_cartoon_show = input_cartoon_show.byte()
-
-        tb: SummaryWriter = self.logger.experiment
-        tb.add_image('input_photo', input_photo_show, batch_idx)
-        tb.add_image('generator_img', generator_img_show, batch_idx)
-        tb.add_image('output', output_show, batch_idx)
-        tb.add_image('input_cartoon', input_cartoon_show, batch_idx)
 
       return d_loss_total
 
@@ -248,6 +237,12 @@ class GAN(pl.LightningModule):
     opt_d = torch.optim.Adam(itertools.chain(self.disc_blur.parameters(),
                                              self.disc_gray.parameters()), lr=lr_d, betas=(b1, b2))
     return [DummyOptimizer(), opt_g, opt_d], []
+
+  def log_images(self, images_dict: Dict[str, torch.Tensor], num: int = 4):
+    for k, images in images_dict.items():
+      image_show = torchvision.utils.make_grid(images[:num], nrow=num)
+      image_show = denormalize(image_show)  # to [0~1]
+      self.logger.experiment.add_image(k, image_show, self.global_step)
 
 
 if __name__ == "__main__":

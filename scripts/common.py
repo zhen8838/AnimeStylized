@@ -60,10 +60,11 @@ def run_train(model_class, datamodule_clss):
   with open(sys.argv[1]) as f:
     config: dict = safe_load(f)
   datamodule = datamodule_clss(**config['dataset'])
-  model = model_class(**config['model'])
+  model: pl.LightningModule = model_class(**config['model'])
   if 'load_from_checkpoint' in config.keys():
     if config['load_from_checkpoint'] is not None:
-      model.load_from_checkpoint(config['load_from_checkpoint'], strict=False)
+      # NOTE overwrite the old model hparam
+      model.load_from_checkpoint(config['load_from_checkpoint'], strict=False, **config['model'])
 
   ckpt_callback = CusModelCheckpoint(**config['checkpoint'])
   logger = TensorBoardLogger(**config['logger'])

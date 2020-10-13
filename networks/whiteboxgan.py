@@ -31,7 +31,7 @@ class ResBlock(nn.Module):
 
 
 class UnetGenerator(nn.Module):
-  def __init__(self, normalize: bool = False, channel=32, num_blocks=4):
+  def __init__(self, channel=32, num_blocks=4):
     super().__init__()
 
     self.conv = nn.Conv2d(3, channel, [7, 7], padding=3)  # same 256,256
@@ -50,10 +50,7 @@ class UnetGenerator(nn.Module):
 
     self.leak_relu = nn.LeakyReLU(inplace=True)
     self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
-    if normalize:
-      self.act = nn.Tanh()
-    else:
-      self.act = lambda x: x
+    self.act = nn.Tanh()
 
   def forward(self, inputs):
     x0 = self.conv(inputs)
@@ -141,20 +138,15 @@ class ResNetPreTrained(pl.LightningModule):
 
 
 class VGGPreTrained(pl.LightningModule):
-  def __init__(self, normalize: bool):
+  def __init__(self):
     super().__init__()
     self.vgg = torchvision.models.vgg19(pretrained=True)
-    self.normalize = normalize
     del self.vgg.avgpool
     del self.vgg.classifier
 
   def _process(self, x):
-    # NOTE 如果图像范围为0-255，那么先归一化到0-1再归一化
-    if self.normalize:
-      x = denormalize(x)
-    else:
-      x = x / 255
-    return self.vgg_normalize(x)
+    # NOTE 图像范围为[-1~1]，先denormalize到0-1再归一化
+    return self.vgg_normalize(denormalize(x))
 
   def setup(self, device: torch.device):
     mean: torch.Tensor = torch.tensor([0.485, 0.456, 0.406], device=device)

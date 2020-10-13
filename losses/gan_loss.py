@@ -20,11 +20,14 @@ class GanLoss(nn.Module):
 class LSGanLoss(nn.Module):
   def __init__(self) -> None:
     super().__init__()
+    # NOTE c=b a=0
 
   def _forward_d_loss(self, real_logit, fake_logit):
+    # 1/2 * [(real-b)^2 + (fake-a)^2]
     return 0.5 * (torch.mean((real_logit - 1)**2) + torch.mean(fake_logit**2))
 
   def _forward_g_loss(self, real_logit, fake_logit):
+    # 1/2 * (fake-c)^2
     return torch.mean((fake_logit - 1)**2)
 
   def forward(self, real_logit, fake_logit):

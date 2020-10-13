@@ -6,6 +6,7 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision.transforms import Compose, Normalize
 from torchvision.datasets import VisionDataset
 from torchvision.datasets.folder import default_loader
+from torchvision.datasets.samplers import RandomClipSampler
 import random
 import cv2
 import numpy as np
@@ -100,10 +101,10 @@ class AnimeGanDataSet(Dataset):
     return d
 
   def do_totensor(self, d: dict):
-    """ 只转换通道，不缩小数据尺度 """
+    """ to tensor will convert image to 0~1 """
     if self.totenor:
       for k, v in d.items():
-        d[k] = torch.from_numpy(v.transpose((2, 0, 1))).float()
+        d[k] = tf.to_tensor(v)
     return d
 
   def process_train(self, real_path, anime_path, anime_smooth_path) -> Dict[str, torch.Tensor]:
@@ -156,7 +157,7 @@ class WhiteBoxGanDataModule(pl.LightningDataModule):
                                      totenor=self.totenor)
 
   def train_dataloader(self):
-    return DataLoader(self.ds_train, batch_size=self.batch_size, num_workers=self.num_workers)
+    return DataLoader(self.ds_train, shuffle=True, batch_size=self.batch_size, num_workers=self.num_workers)
 
   def val_dataloader(self):
     return DataLoader(self.ds_val, batch_size=self.batch_size, num_workers=self.num_workers)

@@ -1,0 +1,4 @@
+conda create --name torch python=3.8 -y
+conda activate torch
+conda install pytorch torchvision cudatoolkit=10.1 -c pytorch
+pip install pytorch_lightning opencv_python scikit-image joblib

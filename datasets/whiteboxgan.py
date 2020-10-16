@@ -80,6 +80,7 @@ class AnimeGanDataSet(Dataset):
       real_path = self.real_imgs[index]
       randidx = random.randint(0, self.anime_img_nums - 1)
       anime_path = self.anime_imgs[randidx]
+      randidx = random.randint(0, self.anime_img_nums - 1)
       sooth_path = self.sooth_imgs[randidx]
       d: dict = self.process_train(real_path, anime_path, sooth_path)
     else:
@@ -107,15 +108,18 @@ class AnimeGanDataSet(Dataset):
         d[k] = tf.to_tensor(v)
     return d
 
+  def do_grayscale(self, image: np.ndarray) -> np.ndarray:
+    """ rgb to grayscale keep 3 channel """
+    return np.tile(np.expand_dims(cv2.cvtColor(image, cv2.COLOR_RGB2GRAY), -1), [1, 1, 3])
+
   def process_train(self, real_path, anime_path, anime_smooth_path) -> Dict[str, torch.Tensor]:
     real = imread(real_path)
     anime = imread(anime_path)
     anime_smooth = imread(anime_smooth_path)
     d = dict(real_data=real,
              anime_data=anime,
-             anime_gray_data=np.tile(np.expand_dims(
-                 cv2.cvtColor(anime, cv2.COLOR_RGB2GRAY), -1), [1, 1, 3]),
-             anime_smooth_data=anime_smooth)
+             anime_gray_data=self.do_grayscale(anime),
+             anime_smooth_gray_data=self.do_grayscale(anime_smooth))
     d = self.do_normalize(self.do_totensor(self.do_augment(d)))
     return d
 
@@ -146,10 +150,12 @@ class WhiteBoxGanDataModule(pl.LightningDataModule):
                                       augment=self.augment,
                                       normalize=self.normalize,
                                       totenor=self.totenor)
-      self.ds_val = AnimeGanDataSet(self.root, self.style, train=False,
-                                    augment=self.augment,
-                                    normalize=self.normalize,
-                                    totenor=self.totenor)
+      self.train_loader = DataLoader(
+          self.ds_train, shuffle=True, batch_size=self.batch_size, num_workers=self.num_workers, pin_memory=True)
+      # self.ds_val = AnimeGanDataSet(self.root, self.style, train=False,
+      #                               augment=self.augment,
+      #                               normalize=self.normalize,
+      #                               totenor=self.totenor)
     else:
       self.ds_test = AnimeGanDataSet(self.root, self.style, train=False,
                                      augment=self.augment,
@@ -157,10 +163,11 @@ class WhiteBoxGanDataModule(pl.LightningDataModule):
                                      totenor=self.totenor)
 
   def train_dataloader(self):
-    return DataLoader(self.ds_train, shuffle=True, batch_size=self.batch_size, num_workers=self.num_workers)
+    return self.train_loader
 
   def val_dataloader(self):
-    return DataLoader(self.ds_val, batch_size=self.batch_size, num_workers=self.num_workers)
+    # return DataLoader(self.ds_val, batch_size=4)
+    return self.train_loader
 
   def test_dataloader(self):
-    return DataLoader(self.ds_test, batch_size=self.batch_size, num_workers=self.num_workers)
+    return DataLoader(self.ds_test, batch_size=4)

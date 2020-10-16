@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
-from networks.whiteboxgan import SpectNormDiscriminator, UnetGenerator, VGGPreTrained
+from networks.gan import SpectNormDiscriminator, UnetGenerator, VGGPreTrained
 from datasets.whiteboxgan import WhiteBoxGanDataModule, denormalize
 from losses.gan_loss import LSGanLoss
 from typing import Dict, List, Tuple
@@ -132,7 +132,6 @@ class GAN(pl.LightningModule):
     self.lsgan_loss = LSGanLoss()
     self.colorshift = ColorShift()
     self.pretrained = VGGPreTrained()
-    self.pretrained.freeze()
     self.l1_loss = nn.L1Loss('mean')
 
   def on_train_start(self) -> None:
@@ -146,14 +145,6 @@ class GAN(pl.LightningModule):
     real_logit = model(real)
     fake_logit = model(fake)
     return real_logit, fake_logit
-
-  @staticmethod
-  def variation_loss(image, k_size=1):
-    h, w = image.shape[1:3]
-    tv_h = torch.mean((image[:, k_size:, :, :] - image[:, :h - k_size, :, :])**2)  # 上下两列交叉相减
-    tv_w = torch.mean((image[:, :, k_size:, :] - image[:, :, :w - k_size, :])**2)  # 左右两行交叉相减
-    tv_loss = (tv_h + tv_w) / (3 * h * w)
-    return tv_loss
 
   def training_step(self, batch: Dict[str, torch.Tensor], batch_idx, optimizer_idx):
     input_photo = batch['real_data']
@@ -237,12 +228,6 @@ class GAN(pl.LightningModule):
     opt_d = torch.optim.Adam(itertools.chain(self.disc_blur.parameters(),
                                              self.disc_gray.parameters()), lr=lr_d, betas=(b1, b2))
     return [DummyOptimizer(), opt_g, opt_d], []
-
-  def log_images(self, images_dict: Dict[str, torch.Tensor], num: int = 4):
-    for k, images in images_dict.items():
-      image_show = torchvision.utils.make_grid(images[:num], nrow=num)
-      image_show = denormalize(image_show)  # to [0~1]
-      self.logger.experiment.add_image(k, image_show, self.global_step)
 
 
 if __name__ == "__main__":

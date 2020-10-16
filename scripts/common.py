@@ -7,6 +7,18 @@ from typing import Optional
 import torch
 import numpy as np
 from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zero_info
+from typing import Dict
+import torchvision
+from datasets.whiteboxgan import denormalize
+
+
+def log_images(cls: pl.LightningModule,
+               images_dict: Dict[str, torch.Tensor],
+               num: int = 4):
+  for k, images in images_dict.items():
+    image_show = torchvision.utils.make_grid(images[:num], nrow=num)
+    image_show = denormalize(image_show)  # to [0~1]
+    cls.logger.experiment.add_image(k, image_show, cls.global_step)
 
 
 class CusModelCheckpoint(ModelCheckpoint):
@@ -63,8 +75,10 @@ def run_train(model_class, datamodule_clss):
   model: pl.LightningModule = model_class(**config['model'])
   if 'load_from_checkpoint' in config.keys():
     if config['load_from_checkpoint'] is not None:
-      # NOTE overwrite the old model hparam
-      model.load_from_checkpoint(config['load_from_checkpoint'], strict=False, **config['model'])
+      # NOTE overwrite the old model hparam, need reset whole module
+      model = model.load_from_checkpoint(
+          config['load_from_checkpoint'],
+          strict=False, **config['model'])
 
   ckpt_callback = CusModelCheckpoint(**config['checkpoint'])
   logger = TensorBoardLogger(**config['logger'])

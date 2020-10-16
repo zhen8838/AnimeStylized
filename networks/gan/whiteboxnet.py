@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.functional import pad
 from torch.nn.utils import spectral_norm
 import torchvision
 import torchvision.transforms as transforms
@@ -116,6 +117,10 @@ class ResNetPreTrained(pl.LightningModule):
     super().__init__()
     self.res = torchvision.models.resnet18(pretrained=True)
 
+  def train(self, mode: bool):
+    """ avoid pytorch light auto set trian mode """
+    return super().train(False)
+
   def _forward_impl(self, x):
     # See note [TorchScript super()]
     x = self.res.conv1(x)
@@ -154,12 +159,17 @@ class VGGPreTrained(pl.LightningModule):
     mean = mean[None, :, None, None]
     std = std[None, :, None, None]
     self.vgg_normalize = lambda x: normalize(x, mean, std)
-    self.vgg.to(device)
+    self.freeze()
+
+  def train(self, mode: bool):
+    """ avoid pytorch light auto set trian mode """
+    return super().train(False)
 
   def _forward_impl(self, x):
     x = self._process(x)
     # See note [TorchScript super()]
-    x = self.vgg.features(x)
+    # NOTE get output with out relu activation
+    x = self.vgg.features[:26](x)
     # x = self.avgpool(x)
     # x = torch.flatten(x, 1)
     # x = self.fc(x)

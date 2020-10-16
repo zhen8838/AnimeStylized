@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
-from networks.whiteboxgan import SpectNormDiscriminator, UnetGenerator, VGGPreTrained
+from networks.gan import SpectNormDiscriminator, UnetGenerator, VGGPreTrained
 from datasets.whiteboxgan import WhiteBoxGanDataModule, denormalize
 from losses.gan_loss import LSGanLoss
 from typing import Dict, List
@@ -20,6 +20,7 @@ class GAN(pl.LightningModule):
       lr: float = 2e-4,
       b1: float = 0.5,
       b2: float = 0.99,
+      extra_recon: bool = False,
       **kwargs
   ):
     super().__init__()
@@ -29,7 +30,6 @@ class GAN(pl.LightningModule):
     self.generator = UnetGenerator()
     self.l1_loss = nn.L1Loss('mean')
     self.pretrained = VGGPreTrained()
-    self.pretrained.freeze()
 
   def forward(self, im):
     return self.generator(im)
@@ -49,12 +49,15 @@ class GAN(pl.LightningModule):
     vgg_output = self.pretrained(generator_img)
 
     vgg_recon_loss = self.l1_loss(vgg_photo, vgg_output)
-    recon_loss = self.l1_loss(generator_img, input_photo)
-    total_loss = vgg_recon_loss + recon_loss
+    total_loss = vgg_recon_loss
+    log_dict = {'loss': total_loss,
+                'vgg_loss': vgg_recon_loss}
+    if self.hparams.extra_recon:
+      recon_loss = self.l1_loss(generator_img, input_photo)
+      total_loss += recon_loss
+      log_dict['recon_loss'] = recon_loss
 
-    self.log_dict({'loss': total_loss,
-                   'vgg_loss': vgg_recon_loss,
-                   'recon_loss': recon_loss})
+    self.log_dict(log_dict)
 
     if batch_idx % 20 == 0:
       input_photo_show = torchvision.utils.make_grid(input_photo[:4], nrow=4)

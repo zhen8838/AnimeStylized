@@ -67,6 +67,13 @@ class CusModelCheckpoint(ModelCheckpoint):
                   "all": torch.tensor(True)}[self.mode]
     return monitor_op(current, self.best_k_models[self.kth_best_model_path]).item()
 
+  def on_validation_end(self, trainer, pl_module):
+    """ do not save when after validation"""
+    pass
+
+  def on_train_end(self, trainer, pl_module):
+    self.save_checkpoint(trainer, pl_module)
+
 
 def run_train(model_class, datamodule_clss):
   with open(sys.argv[1]) as f:

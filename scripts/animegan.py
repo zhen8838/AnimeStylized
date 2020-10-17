@@ -2,7 +2,8 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
-from networks.gan import AnimeGeneratorLite, VGGPreTrained, AnimeDiscriminator
+from networks.gan import AnimeGeneratorLite, AnimeDiscriminator, UnetGenerator, SpectNormDiscriminator
+from networks.pretrainnet import VGGPreTrained
 from datasets.whiteboxgan import WhiteBoxGanDataModule, denormalize
 from losses.gan_loss import LSGanLoss
 from losses.function import variation_loss, rgb2yuv
@@ -16,6 +17,14 @@ from scripts.common import run_train, log_images
 
 
 class AnimeGAN(pl.LightningModule):
+  GeneratorDict = {
+      'AnimeGeneratorLite': AnimeGeneratorLite,
+      'UnetGenerator': UnetGenerator,
+  }
+  DiscriminatorDict = {
+      'AnimeDiscriminator': AnimeDiscriminator,
+      'SpectNormDiscriminator': SpectNormDiscriminator,
+  }
 
   def __init__(
       self,
@@ -27,13 +36,15 @@ class AnimeGAN(pl.LightningModule):
       sty_weight: float = 2.8,
       color_weight: float = 10.,
       pre_trained_ckpt: str = None,
+      generator_name: str = 'AnimeGeneratorLite',
+      discriminator_name: str = 'AnimeDiscriminator',
       **kwargs
   ):
     super().__init__()
     self.save_hyperparameters()
 
     # networks
-    self.generator = AnimeGeneratorLite()
+    self.generator = self.GeneratorDict[generator_name]()
     if pre_trained_ckpt:
       ckpt = torch.load(pre_trained_ckpt)
       generatordict = dict(filter(lambda k: 'generator' in k[0], ckpt['state_dict'].items()))
@@ -43,7 +54,7 @@ class AnimeGAN(pl.LightningModule):
       del generatordict
       print("Success load pretrained generator from", pre_trained_ckpt)
 
-    self.discriminator = AnimeDiscriminator()
+    self.discriminator = self.DiscriminatorDict[discriminator_name]()
     self.lsgan_loss = LSGanLoss()
     self.pretrained = VGGPreTrained()
     self.l1_loss = nn.L1Loss()
@@ -142,13 +153,7 @@ class AnimeGAN(pl.LightningModule):
 
   def validation_step(self, batch: Dict[str, torch.Tensor], batch_idx):
     input_photo = batch['real_data']
-    input_cartoon = batch['anime_data']
-    anime_gray_data = batch['anime_gray_data']
-    anime_smooth_gray_data = batch['anime_smooth_gray_data']
     log_images(self, {'input/real': input_photo,
-                      'input/anime': input_cartoon,
-                      'input/gray': anime_gray_data,
-                      'input/smooth_gray': anime_smooth_gray_data,
                       'generate/anime': self.generator(input_photo)})
 
 

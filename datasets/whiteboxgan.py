@@ -12,18 +12,11 @@ import cv2
 import numpy as np
 import torchvision.transforms.functional as tf
 import torchvision.transforms as T
+from .dsfunction import normalize, denormalize
 
 
 def imread(path: str):
   return cv2.cvtColor(cv2.imread(path, flags=cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
-
-
-def normalize(im: np.ndarray, mean=0.5, std=0.5):
-  return (im - mean) / std
-
-
-def denormalize(im: np.ndarray, mean=0.5, std=0.5):
-  return im * std + mean
 
 
 def reduce_hw(img_hw: List[int], min_hw: List[int]) -> Tuple[int]:
@@ -150,12 +143,11 @@ class WhiteBoxGanDataModule(pl.LightningDataModule):
                                       augment=self.augment,
                                       normalize=self.normalize,
                                       totenor=self.totenor)
-      self.train_loader = DataLoader(
-          self.ds_train, shuffle=True, batch_size=self.batch_size, num_workers=self.num_workers, pin_memory=True)
-      # self.ds_val = AnimeGanDataSet(self.root, self.style, train=False,
-      #                               augment=self.augment,
-      #                               normalize=self.normalize,
-      #                               totenor=self.totenor)
+      self.ds_val = AnimeGanDataSet(self.root, self.style,
+                                    train=False,
+                                    augment=self.augment,
+                                    normalize=self.normalize,
+                                    totenor=self.totenor)
     else:
       self.ds_test = AnimeGanDataSet(self.root, self.style, train=False,
                                      augment=self.augment,
@@ -163,11 +155,12 @@ class WhiteBoxGanDataModule(pl.LightningDataModule):
                                      totenor=self.totenor)
 
   def train_dataloader(self):
-    return self.train_loader
+    return DataLoader(
+        self.ds_train, shuffle=True, batch_size=self.batch_size, num_workers=self.num_workers, pin_memory=True)
 
   def val_dataloader(self):
-    # return DataLoader(self.ds_val, batch_size=4)
-    return self.train_loader
+    return DataLoader(self.ds_val, shuffle=True,
+                      batch_size=4, num_workers=4)
 
   def test_dataloader(self):
     return DataLoader(self.ds_test, batch_size=4)

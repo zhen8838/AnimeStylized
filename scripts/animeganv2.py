@@ -2,7 +2,8 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
-from networks.gan import SpectNormDiscriminator, UnetGenerator, VGGPreTrained, AnimeDiscriminator
+from networks.gan import SpectNormDiscriminator, UnetGenerator, AnimeDiscriminator
+from networks.pretrainnet import VGGPreTrained
 from datasets.whiteboxgan import WhiteBoxGanDataModule, denormalize
 from losses.gan_loss import LSGanLoss
 from losses.function import variation_loss, rgb2yuv
@@ -18,38 +19,8 @@ from scripts.animegan import AnimeGAN
 
 class AnimeGANv2(AnimeGAN):
 
-  def __init__(
-      self,
-      lr_g: float = 2e-4,
-      lr_d: float = 2e-4,
-      g_adv_weight: float = 300.,
-      d_adv_weight: float = 300.,
-      con_weight: float = 1.5,
-      sty_weight: float = 2.8,
-      color_weight: float = 10.,
-      tv_weight: float = 1.,
-      pre_trained_ckpt: str = None,
-      **kwargs
-  ):
-    super().__init__()
-    self.save_hyperparameters()
-
-    # networks
-    self.generator = UnetGenerator()
-    if pre_trained_ckpt:
-      ckpt = torch.load(pre_trained_ckpt)
-      generatordict = dict(filter(lambda k: 'generator' in k[0], ckpt['state_dict'].items()))
-      generatordict = {k.split('.', 1)[1]: v for k, v in generatordict.items()}
-      self.generator.load_state_dict(generatordict, True)
-      del ckpt
-      del generatordict
-      print("Success load pretrained generator from", pre_trained_ckpt)
-
-    self.discriminator = AnimeDiscriminator()
-    self.lsgan_loss = LSGanLoss()
-    self.pretrained = VGGPreTrained()
-    self.l1_loss = nn.L1Loss('mean')
-    self.huber_loss = nn.SmoothL1Loss('mean')
+  def __init__(self, tv_weight: float = 1., **kwargs):
+    super().__init__(tv_weight=tv_weight, **kwargs)
 
   def inner_training_step(self, batch: Dict[str, torch.Tensor]):
     input_photo = batch['real_data']
@@ -100,17 +71,6 @@ class AnimeGANv2(AnimeGAN):
     elif optimizer_idx == 1:  # train generator
       _, g_loss_total = self.inner_training_step(batch)
       return g_loss_total
-
-  def validation_step(self, batch: Dict[str, torch.Tensor], batch_idx):
-    input_photo = batch['real_data']
-    input_cartoon = batch['anime_data']
-    anime_gray_data = batch['anime_gray_data']
-    anime_smooth_gray_data = batch['anime_smooth_gray_data']
-    log_images(self, {'input/real': input_photo,
-                      'input/anime': input_cartoon,
-                      'input/gray': anime_gray_data,
-                      'input/smooth_gray': anime_smooth_gray_data,
-                      'generate/anime': self.generator(input_photo)})
 
 
 if __name__ == "__main__":

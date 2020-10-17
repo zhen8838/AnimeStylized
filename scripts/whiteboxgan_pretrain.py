@@ -2,7 +2,8 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
-from networks.gan import SpectNormDiscriminator, UnetGenerator, VGGPreTrained
+from networks.gan import SpectNormDiscriminator, UnetGenerator
+from networks.pretrainnet import VGGPreTrained
 from datasets.whiteboxgan import WhiteBoxGanDataModule, denormalize
 from losses.gan_loss import LSGanLoss
 from typing import Dict, List

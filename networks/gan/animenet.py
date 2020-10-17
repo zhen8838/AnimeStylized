@@ -55,8 +55,8 @@ class Conv2DNormLReLU(nn.Module):
     self.conv = nn.Conv2d(in_channels, out_channels,
                           kernel_size, stride,
                           padding, bias=bias)
-    self.norm = nn.GroupNorm(1, out_channels,
-                             affine=True)
+    self.norm = nn.InstanceNorm2d(out_channels,
+                                  affine=True)
     self.lrelu = nn.LeakyReLU(0.2, inplace=True)
 
   def forward(self, x):

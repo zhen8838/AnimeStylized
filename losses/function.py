@@ -39,11 +39,9 @@ def variation_loss(image: torch.Tensor, ksize=1):
   A smooth loss in fact. Like the smooth prior in MRF.
   V(y) = || y_{n+1} - y_n ||_2
   """
-  b, c, h, w = image.shape
-  tv_h = image[:, :, :-ksize, :] - image[:, :, ksize:, :]
-  tv_w = image[:, :, :, :-ksize] - image[:, :, :, ksize:]
-
-  return (l2_loss(tv_h) + l2_loss(tv_w)) / (c * h * w)
+  dh = image[:, :, :-ksize, :] - image[:, :, ksize:, :]
+  dw = image[:, :, :, :-ksize] - image[:, :, :, ksize:]
+  return (torch.mean(torch.abs(dh)) + torch.mean(torch.abs(dw)))
 
 
 def rgb2yuv(rgb: torch.Tensor) -> torch.Tensor:

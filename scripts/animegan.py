@@ -3,7 +3,7 @@ import sys
 sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
 from networks.gan import AnimeGeneratorLite, AnimeDiscriminator, UnetGenerator, SpectNormDiscriminator
-from networks.pretrainnet import VGGPreTrained
+from networks.pretrainnet import VGGPreTrained, VGGCaffePreTrained
 from datasets.whiteboxgan import WhiteBoxGanDataModule, denormalize
 from losses.gan_loss import LSGanLoss
 from losses.function import variation_loss, rgb2yuv
@@ -26,6 +26,11 @@ class AnimeGAN(pl.LightningModule):
       'SpectNormDiscriminator': SpectNormDiscriminator,
   }
 
+  PreTrainedDict = {
+      'VGGPreTrained': VGGPreTrained,
+      'VGGCaffePreTrained': VGGCaffePreTrained
+  }
+
   def __init__(
       self,
       lr_g: float = 2e-4,
@@ -38,6 +43,7 @@ class AnimeGAN(pl.LightningModule):
       pre_trained_ckpt: str = None,
       generator_name: str = 'AnimeGeneratorLite',
       discriminator_name: str = 'AnimeDiscriminator',
+      pretrained_name: str = 'VGGCaffePreTrained',
       **kwargs
   ):
     super().__init__()
@@ -56,7 +62,7 @@ class AnimeGAN(pl.LightningModule):
 
     self.discriminator = self.DiscriminatorDict[discriminator_name]()
     self.lsgan_loss = LSGanLoss()
-    self.pretrained = VGGPreTrained()
+    self.pretrained = self.PreTrainedDict[pretrained_name]()
     self.l1_loss = nn.L1Loss()
     self.huber_loss = nn.SmoothL1Loss()
 
@@ -66,11 +72,10 @@ class AnimeGAN(pl.LightningModule):
   def forward(self, im):
     return self.generator(im)
 
-  def gram(self, x: torch.Tensor):
+  def gram(self, x):
     b, c, h, w = x.shape
-    t = x.view(b, c, h * w)
-    return (torch.matmul(t, t.transpose(1, 2)) /
-            (c * h * w))
+    gram = torch.einsum('bchw,bdhw->bcd', x, x)
+    return gram / (c * h * w)
 
   def style_loss(self, style, fake):
     return self.l1_loss(self.gram(style), self.gram(fake))
@@ -97,7 +102,7 @@ class AnimeGAN(pl.LightningModule):
     gray_loss = torch.mean(torch.square(gray))
     fake_loss = torch.mean(torch.square(fake))
     real_blur_loss = torch.mean(torch.square(real_blur))
-    return 1.7 * real_loss, 1.7 * gray_loss, 1.7 * fake_loss, 0.8 * real_blur_loss
+    return 1.2 * real_loss, 1.2 * gray_loss, 1.2 * fake_loss, 0.8 * real_blur_loss
 
   def generator_loss(self, fake_logit):
     return self.lsgan_loss._forward_g_loss(fake_logit)
@@ -109,13 +114,12 @@ class AnimeGAN(pl.LightningModule):
     anime_smooth_gray_data = batch['anime_smooth_gray_data']
 
     generated = self.generator(input_photo)
-    anime_logit = self.discriminator(input_cartoon)
-    anime_gray_logit = self.discriminator(anime_gray_data)
-
-    smooth_logit = self.discriminator(anime_smooth_gray_data)
     generated_logit = self.discriminator(generated)
 
     if optimizer_idx == 0:  # train discriminator
+      anime_logit = self.discriminator(input_cartoon)
+      anime_gray_logit = self.discriminator(anime_gray_data)
+      smooth_logit = self.discriminator(anime_smooth_gray_data)
       (d_real_loss, d_gray_loss,
        d_fake_loss, d_real_blur_loss) = self.discriminator_loss(
           anime_logit, anime_gray_logit,

@@ -106,11 +106,12 @@ class AnimeGanDataSet(Dataset):
     return np.tile(np.expand_dims(cv2.cvtColor(image, cv2.COLOR_RGB2GRAY), -1), [1, 1, 3])
 
   def process_train(self, real_path, anime_path, anime_smooth_path) -> Dict[str, torch.Tensor]:
+    data_mean = np.array([13.1360, -8.6698, -4.4661], dtype='float32')
     real = imread(real_path)
     anime = imread(anime_path)
     anime_smooth = imread(anime_smooth_path)
     d = dict(real_data=real,
-             anime_data=anime,
+             anime_data=np.clip(anime + data_mean, 0, 255).astype('uint8'),
              anime_gray_data=self.do_grayscale(anime),
              anime_smooth_gray_data=self.do_grayscale(anime_smooth))
     d = self.do_normalize(self.do_totensor(self.do_augment(d)))

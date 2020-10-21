@@ -107,11 +107,8 @@ class AnimeGAN(pl.LightningModule):
   def generator_loss(self, fake_logit):
     return self.lsgan_loss._forward_g_loss(fake_logit)
 
-  def training_step(self, batch: Dict[str, torch.Tensor], batch_idx, optimizer_idx):
-    input_photo = batch['real_data']
-    input_cartoon = batch['anime_data']
-    anime_gray_data = batch['anime_gray_data']
-    anime_smooth_gray_data = batch['anime_smooth_gray_data']
+  def training_step(self, batch, batch_idx, optimizer_idx):
+    input_photo, (input_cartoon, anime_gray_data), anime_smooth_gray_data = batch
 
     generated = self.generator(input_photo)
     generated_logit = self.discriminator(generated)
@@ -155,8 +152,8 @@ class AnimeGAN(pl.LightningModule):
                              lr=self.hparams.lr_g, betas=(0.5, 0.999))
     return opt_d, opt_g
 
-  def validation_step(self, batch: Dict[str, torch.Tensor], batch_idx):
-    input_photo = batch['real_data']
+  def validation_step(self, batch, batch_idx):
+    input_photo = batch
     log_images(self, {'input/real': input_photo,
                       'generate/anime': self.generator(input_photo)})
 

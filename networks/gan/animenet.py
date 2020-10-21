@@ -21,7 +21,7 @@ class AnimeDiscriminator(nn.Module):
           nn.LeakyReLU(0.2, inplace=True),
           spectral_norm(nn.Conv2d(channel * 2, channel * 4,
                                   3, stride=1, padding=1, bias=False)),
-          nn.InstanceNorm2d(channel * 4, affine=True),
+          nn.GroupNorm(1, channel * 4, affine=True),
           nn.LeakyReLU(0.2, inplace=True)
       ])
       last_channel = channel * 4
@@ -33,7 +33,7 @@ class AnimeDiscriminator(nn.Module):
     self.head = nn.Sequential(*[
         spectral_norm(nn.Conv2d(last_channel, channel * 2, 3,
                                 stride=1, padding=1, bias=False)),
-        nn.InstanceNorm2d(channel * 2, affine=True),
+        nn.GroupNorm(1, channel * 2, affine=True),
         nn.LeakyReLU(0.2, inplace=True),
         spectral_norm(nn.Conv2d(channel * 2, 1, 3, stride=1, padding=1, bias=False))])
 
@@ -55,8 +55,9 @@ class Conv2DNormLReLU(nn.Module):
     self.conv = nn.Conv2d(in_channels, out_channels,
                           kernel_size, stride,
                           padding, bias=bias)
-    self.norm = nn.InstanceNorm2d(out_channels,
-                                  affine=True)
+    # NOTE layer norm is crucial for animegan!
+    self.norm = nn.GroupNorm(1, out_channels,
+                             affine=True)
     self.lrelu = nn.LeakyReLU(0.2, inplace=True)
 
   def forward(self, x):

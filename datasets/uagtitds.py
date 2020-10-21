@@ -26,6 +26,9 @@ class ImageFolder(VisionDataset):
 
     return sample
 
+  def size(self, idx):
+    return len(self.samples)
+
 
 class MergeDataset(Dataset):
   r"""Dataset wrapping tensors.

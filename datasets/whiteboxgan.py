@@ -2,11 +2,9 @@ from typing import List, Dict, Tuple
 import pytorch_lightning as pl
 from pathlib import Path
 import torch
-from torch.utils.data import Dataset, DataLoader
-from torchvision.transforms import Compose, Normalize
-from torchvision.datasets import VisionDataset
-from torchvision.datasets.folder import default_loader
-from torchvision.datasets.samplers import RandomClipSampler
+from torch.utils.data import Dataset, DataLoader, TensorDataset
+from torchvision import transforms
+from .uagtitds import ImageFolder, MergeDataset, MultiRandomSampler
 import random
 import cv2
 import numpy as np
@@ -36,9 +34,10 @@ def reduce_hw(img_hw: List[int], min_hw: List[int]) -> Tuple[int]:
 
 
 class AnimeGanDataSet(Dataset):
-  def __init__(self, root: str, style: str,
+  def __init__(self, root: str, style: str, data_mean: list = [13.1360, -8.6698, -4.4661],
                train=True, augment=True, normalize=True, totenor=True):
     super().__init__()
+    self.data_mean = np.array(data_mean, dtype='float32')
     self.root = Path(root)
     self.augment = augment
     self.normalize = normalize
@@ -106,14 +105,14 @@ class AnimeGanDataSet(Dataset):
     return np.tile(np.expand_dims(cv2.cvtColor(image, cv2.COLOR_RGB2GRAY), -1), [1, 1, 3])
 
   def process_train(self, real_path, anime_path, anime_smooth_path) -> Dict[str, torch.Tensor]:
-    data_mean = np.array([13.1360, -8.6698, -4.4661], dtype='float32')
     real = imread(real_path)
     anime = imread(anime_path)
-    anime_smooth = imread(anime_smooth_path)
+    anime_smooth = cv2.imread(anime_smooth_path, cv2.IMREAD_GRAYSCALE)
+    anime_gray = cv2.imread(anime_path, cv2.IMREAD_GRAYSCALE)
     d = dict(real_data=real,
-             anime_data=np.clip(anime + data_mean, 0, 255).astype('uint8'),
-             anime_gray_data=self.do_grayscale(anime),
-             anime_smooth_gray_data=self.do_grayscale(anime_smooth))
+             anime_data=np.clip(anime + self.data_mean, 0, 255).astype('uint8'),
+             anime_gray_data=np.tile(anime_gray[..., None], [1, 1, 3]),
+             anime_smooth_gray_data=np.tile(anime_smooth[..., None], [1, 1, 3]))
     d = self.do_normalize(self.do_totensor(self.do_augment(d)))
     return d
 
@@ -126,10 +125,11 @@ class AnimeGanDataSet(Dataset):
 
 
 class WhiteBoxGanDataModule(pl.LightningDataModule):
-  def __init__(self, root: str, style: str, batch_size: int = 8, num_workers: int = 4,
+  def __init__(self, root: str, style: str,
+               batch_size: int = 8, num_workers: int = 4,
                augment=True, normalize=True, totenor=True):
     super().__init__()
-    self.root = root
+    self.root = Path(root)
     self.style = style
     self.batch_size = batch_size
     self.num_workers = num_workers
@@ -138,30 +138,58 @@ class WhiteBoxGanDataModule(pl.LightningDataModule):
     self.totenor = totenor
     self.dims = (3, 256, 256)
 
+    idenity = transforms.Lambda(lambda x: x)
+    self.train_transform = transforms.Compose([
+        transforms.RandomHorizontalFlip() if augment else idenity,
+        transforms.ToTensor() if totenor else idenity,
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)) if normalize else idenity])
+
+    self.train_gray_transform = transforms.Compose([
+        transforms.Grayscale(3),
+        transforms.RandomHorizontalFlip() if augment else idenity,
+        transforms.ToTensor() if totenor else idenity,
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)) if normalize else idenity])
+
+    self.val_transform = transforms.Compose([
+        transforms.ToTensor() if totenor else idenity,
+        transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5) if normalize else idenity)])
+
   def setup(self, stage=None):
     if stage == 'fit':
-      self.ds_train = AnimeGanDataSet(self.root, self.style, train=True,
-                                      augment=self.augment,
-                                      normalize=self.normalize,
-                                      totenor=self.totenor)
-      self.ds_val = AnimeGanDataSet(self.root, self.style,
-                                    train=False,
-                                    augment=self.augment,
-                                    normalize=self.normalize,
-                                    totenor=self.totenor)
+      trian_root = (self.root / 'train_photo')
+      anime_root = (self.root / f'{self.style}/style')
+      smooth_root = (self.root / f'{self.style}/smooth')
+      train_real = ImageFolder(trian_root.as_posix(),
+                               transform=self.train_transform)
+      train_anime = ImageFolder(anime_root.as_posix(),
+                                transform=self.train_transform)
+      train_anime_gray = ImageFolder(anime_root.as_posix(),
+                                     transform=self.train_gray_transform)
+      train_anime = TensorDataset(train_anime, train_anime_gray)
+      train_smooth_gray = ImageFolder(smooth_root.as_posix(),
+                                      transform=self.train_gray_transform)
+      self.ds_train = MergeDataset(train_real, train_anime, train_smooth_gray)
+
+      val_root = (self.root / 'test/test_photo')
+      self.ds_val = ImageFolder(val_root.as_posix(),
+                                transform=self.val_transform)
     else:
-      self.ds_test = AnimeGanDataSet(self.root, self.style, train=False,
-                                     augment=self.augment,
-                                     normalize=self.normalize,
-                                     totenor=self.totenor)
+      val_root = (self.root / 'test/test_photo')
+      self.ds_val = ImageFolder(val_root.as_posix(),
+                                transform=self.val_transform)
 
   def train_dataloader(self):
     return DataLoader(
-        self.ds_train, shuffle=True, batch_size=self.batch_size, num_workers=self.num_workers, pin_memory=True)
+        self.ds_train,
+        sampler=MultiRandomSampler(self.ds_train),
+        batch_size=self.batch_size,
+        num_workers=self.num_workers,
+        pin_memory=True)
 
   def val_dataloader(self):
     return DataLoader(self.ds_val, shuffle=True,
                       batch_size=4, num_workers=4)
 
   def test_dataloader(self):
-    return DataLoader(self.ds_test, batch_size=4)
+    return DataLoader(self.ds_val, shuffle=True,
+                      batch_size=4, num_workers=4)

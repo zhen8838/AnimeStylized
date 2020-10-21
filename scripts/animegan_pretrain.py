@@ -16,11 +16,8 @@ from scripts.animegan import AnimeGAN
 
 class AnimeGANPreTrain(AnimeGAN):
 
-  def training_step(self, batch: Dict[str, torch.Tensor], batch_idx):
-    input_photo = batch['real_data']
-    # input_cartoon = batch['anime_data']
-    # anime_gray_data = batch['anime_gray_data']
-    # anime_smooth_data = batch['anime_smooth_data']
+  def training_step(self, batch: Tuple[torch.Tensor], batch_idx):
+    input_photo = batch[0]
 
     generated = self.generator(input_photo)
 

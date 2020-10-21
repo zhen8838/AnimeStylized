@@ -22,11 +22,9 @@ class AnimeGANv2(AnimeGAN):
   def __init__(self, tv_weight: float = 1., **kwargs):
     super().__init__(tv_weight=tv_weight, **kwargs)
 
-  def training_step(self, batch: Dict[str, torch.Tensor], batch_idx, optimizer_idx):
-    input_photo = batch['real_data']
-    input_cartoon = batch['anime_data']
-    anime_gray_data = batch['anime_gray_data']
-    anime_smooth_gray_data = batch['anime_smooth_gray_data']
+  def training_step(self, batch: Tuple[torch.Tensor, Tuple[torch.Tensor, torch.Tensor], torch.Tensor],
+                    batch_idx, optimizer_idx):
+    input_photo, (input_cartoon, anime_gray_data), anime_smooth_gray_data = batch
 
     if optimizer_idx == 0:
       generated = self.generator(input_photo)
@@ -43,7 +41,7 @@ class AnimeGANv2(AnimeGAN):
       d_fake_loss = self.hparams.d_adv_weight * d_fake_loss
       d_real_blur_loss = self.hparams.d_adv_weight * d_real_blur_loss
       d_loss_total = d_real_loss + d_fake_loss + d_gray_loss + d_real_blur_loss
-      
+
       self.log_dict({
           'dis/d_loss': d_loss_total,
           'dis/d_real_loss': d_real_loss,

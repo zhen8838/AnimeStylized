@@ -2,7 +2,7 @@ from .commons import PretrainNet
 import torchvision
 from .gan.mobilefacenet import MobileFaceNet
 import torch
-from datasets.dsfunction import denormalize, normalize
+from datamodules.dsfunction import denormalize, normalize
 import torch.functional as F
 import numpy as np
 import torch.nn as nn

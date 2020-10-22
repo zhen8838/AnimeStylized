@@ -4,15 +4,12 @@ sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
 from networks.gan import AnimeGeneratorLite, AnimeDiscriminator, UnetGenerator, SpectNormDiscriminator
 from networks.pretrainnet import VGGPreTrained, VGGCaffePreTrained
-from datasets.whiteboxgan import WhiteBoxGanDataModule, denormalize
+from datamodules.animegands import AnimeGANDataModule
+from datamodules.dsfunction import denormalize
 from losses.gan_loss import LSGanLoss
-from losses.function import variation_loss, rgb2yuv
-from typing import Dict, List, Tuple
+from losses.lsfunction import variation_loss, rgb2yuv
 import torch
 import torch.nn as nn
-import torch.nn.functional as nf
-import torch.functional as F
-import torchvision.transforms.functional as tf
 from scripts.common import run_train, log_images
 
 
@@ -159,4 +156,4 @@ class AnimeGAN(pl.LightningModule):
 
 
 if __name__ == "__main__":
-  run_train(AnimeGAN, WhiteBoxGanDataModule)
+  run_train(AnimeGAN, AnimeGANDataModule)

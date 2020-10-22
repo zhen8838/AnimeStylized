@@ -4,22 +4,17 @@ sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
 from networks.gan import SpectNormDiscriminator, UnetGenerator
 from networks.pretrainnet import VGGPreTrained
-from datasets.whiteboxgan import WhiteBoxGanDataModule
+from datamodules.animegands import AnimeGANDataModule
 from losses.gan_loss import LSGanLoss
-from typing import Dict, List, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as nf
-import torch.functional as F
-import torchvision.transforms.functional as tf
-import torchvision
 import numpy as np
 from skimage import segmentation, color
 from joblib import Parallel, delayed
 from optimizers import DummyOptimizer
 import itertools
 from torch.distributions import Distribution
-from torch.utils.tensorboard import SummaryWriter
 from scripts.common import run_train
 
 
@@ -79,8 +74,6 @@ class GuidedFilter(nn.Module):
 
 class ColorShift(nn.Module):
   def __init__(self, mode='uniform'):
-    # TODO 输入图像归一化[-1~1]之间，灰度化均值应该同样进行修改
-    # FIXME 原论文叙述中的alpha没有在代码中出现？
     super().__init__()
     self.dist: Distribution = None
     self.mode = mode
@@ -147,7 +140,7 @@ class GAN(pl.LightningModule):
     fake_logit = model(fake)
     return real_logit, fake_logit
 
-  def training_step(self, batch: Dict[str, torch.Tensor], batch_idx, optimizer_idx):
+  def training_step(self, batch, batch_idx, optimizer_idx):
     input_photo = batch['real_data']
     input_cartoon = batch['anime_data']
     # anime_gray_data = batch['anime_gray_data']
@@ -232,4 +225,4 @@ class GAN(pl.LightningModule):
 
 
 if __name__ == "__main__":
-  run_train(GAN, WhiteBoxGanDataModule)
+  run_train(GAN, AnimeGANDataModule)

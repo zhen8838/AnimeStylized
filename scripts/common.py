@@ -9,7 +9,7 @@ import numpy as np
 from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zero_info
 from typing import Dict
 import torchvision
-from datasets.whiteboxgan import denormalize
+from datamodules.dsfunction import denormalize
 
 
 def log_images(cls: pl.LightningModule,

@@ -1,18 +1,11 @@
 import os
 import sys
 sys.path.insert(0, os.getcwd())
-import pytorch_lightning as pl
-from networks.gan import SpectNormDiscriminator, UnetGenerator, AnimeDiscriminator
-from networks.pretrainnet import VGGPreTrained
-from datasets.whiteboxgan import WhiteBoxGanDataModule, denormalize
-from losses.gan_loss import LSGanLoss
-from losses.function import variation_loss, rgb2yuv
+from datamodules.animegands import AnimeGANDataModule
+from datamodules.dsfunction import denormalize
+from losses.lsfunction import variation_loss, rgb2yuv
 from typing import Dict, List, Tuple
 import torch
-import torch.nn as nn
-import torch.nn.functional as nf
-import torch.functional as F
-import torchvision.transforms.functional as tf
 from scripts.common import run_train, log_images
 from scripts.animegan import AnimeGAN
 
@@ -74,4 +67,4 @@ class AnimeGANv2(AnimeGAN):
 
 
 if __name__ == "__main__":
-  run_train(AnimeGANv2, WhiteBoxGanDataModule)
+  run_train(AnimeGANv2, AnimeGANDataModule)

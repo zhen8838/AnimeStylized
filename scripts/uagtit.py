@@ -6,7 +6,7 @@ import pytorch_lightning as pl
 import torch
 import torch.nn as nn
 from typing import Dict, Tuple
-from datasets.uagtitds import UagtitGanDataSet
+from datamodules.uagtitds import UagtitGanDataSet
 from scripts.common import run_train, log_images
 import itertools
 

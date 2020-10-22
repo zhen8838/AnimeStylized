@@ -1,15 +1,9 @@
 import os
 import sys
 sys.path.insert(0, os.getcwd())
-import pytorch_lightning as pl
-from datasets.whiteboxgan import WhiteBoxGanDataModule, denormalize
-from losses.gan_loss import LSGanLoss
+from datamodules.animegands import AnimeGANDataModule
 from typing import Dict, List, Tuple
 import torch
-import torch.nn as nn
-import torch.nn.functional as nf
-import torch.functional as F
-import torchvision.transforms.functional as tf
 from scripts.common import run_train, log_images
 from scripts.animegan import AnimeGAN
 
@@ -37,4 +31,4 @@ class AnimeGANPreTrain(AnimeGAN):
 
 
 if __name__ == "__main__":
-  run_train(AnimeGANPreTrain, WhiteBoxGanDataModule)
+  run_train(AnimeGANPreTrain, AnimeGANDataModule)

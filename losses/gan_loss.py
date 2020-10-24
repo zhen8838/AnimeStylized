@@ -22,15 +22,15 @@ class LSGanLoss(nn.Module):
     super().__init__()
     # NOTE c=b a=0
 
-  def _forward_d_loss(self, real_logit, fake_logit):
+  def _d_loss(self, real_logit, fake_logit):
     # 1/2 * [(real-b)^2 + (fake-a)^2]
     return 0.5 * (torch.mean((real_logit - 1)**2) + torch.mean(fake_logit**2))
 
-  def _forward_g_loss(self, fake_logit):
+  def _g_loss(self, fake_logit):
     # 1/2 * (fake-c)^2
     return torch.mean((fake_logit - 1)**2)
 
   def forward(self, real_logit, fake_logit):
-    g_loss = self._forward_g_loss(fake_logit)
-    d_loss = self._forward_d_loss(real_logit, fake_logit)
+    g_loss = self._g_loss(fake_logit)
+    d_loss = self._d_loss(real_logit, fake_logit)
     return d_loss, g_loss

@@ -107,6 +107,7 @@ class VGGCaffePreTrained(PretrainNet):
     # weights_path = 'models/vgg19.npy'
     data_dict: dict = np.load(weights_path, encoding='latin1', allow_pickle=True).item()
     self.features = self.make_layers(self.cfg, data_dict)
+    del data_dict
 
   def _process(self, x):
     # NOTE 图像范围为[-1~1]，先denormalize到0-1再归一化

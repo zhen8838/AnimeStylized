@@ -85,13 +85,13 @@ class SpectNormDiscriminator(nn.Module):
       l.extend([
           spectral_norm(nn.Conv2d(in_channel, channel * (2**idx), 3, stride=2, padding=1)),
           nn.LeakyReLU(inplace=True),
-          spectral_norm(nn.Conv2d(channel * (2**idx), channel * (2**idx), 3, stride=2, padding=1)),
+          spectral_norm(nn.Conv2d(channel * (2**idx), channel * (2**idx), 3, stride=1, padding=1)),
           nn.LeakyReLU(inplace=True),
       ])
       in_channel = channel * (2**idx)
     self.body = nn.Sequential(*l)
     if self.patch:
-      self.head = spectral_norm(nn.Conv2d(in_channel, 1, 1, padding=1))
+      self.head = spectral_norm(nn.Conv2d(in_channel, 1, 1, padding=0))
     else:
       self.head = nn.Sequential(Mean([1, 2]), nn.Linear(in_channel, 1))
 

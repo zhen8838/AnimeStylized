@@ -3,40 +3,35 @@ import sys
 sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
 from networks.gan import SpectNormDiscriminator, UnetGenerator
-from networks.pretrainnet import VGGPreTrained
-from datamodules.animegands import AnimeGANDataModule
+from networks.pretrainnet import VGGCaffePreTrained
+from datamodules.whiteboxgands import WhiteBoxGANDataModule
 from losses.gan_loss import LSGanLoss
 import torch
 import torch.nn as nn
 import torch.nn.functional as nf
 import numpy as np
-from skimage import segmentation, color
 from joblib import Parallel, delayed
 from optimizers import DummyOptimizer
 import itertools
 from torch.distributions import Distribution
-from scripts.common import run_train
+from scripts.common import run_train, log_images
+from typing import List, Tuple
+from utils.superpix import slic, adaptive_slic, sscolor
+from functools import partial
 
 
-def simple_superpixel(batch_image: np.ndarray, seg_num=200) -> np.ndarray:
+def simple_superpixel(batch_image: np.ndarray, superpixel_fn: callable) -> np.ndarray:
   """ convert batch image to superpixel
 
   Args:
-      batch_image (np.ndarray): np.ndarry, shape must be [b,h,w,c] 
+      batch_image (np.ndarray): np.ndarry, shape must be [b,h,w,c]
       seg_num (int, optional): . Defaults to 200.
 
   Returns:
       np.ndarray: superpixel array, shape = [b,h,w,c]
   """
-  def process_slic(image):
-    seg_label = segmentation.slic(image, n_segments=seg_num, sigma=1,
-                                  compactness=10, convert2lab=True,
-                                  start_label=0)
-    image = color.label2rgb(seg_label, image, kind='avg', bg_label=-1)
-    return image
-
   num_job = batch_image.shape[0]
-  batch_out = Parallel(n_jobs=num_job)(delayed(process_slic)
+  batch_out = Parallel(n_jobs=num_job)(delayed(superpixel_fn)
                                        (image) for image in batch_image)
   return np.array(batch_out)
 
@@ -89,13 +84,29 @@ class ColorShift(nn.Module):
           torch.tensor((0.199, 0.487, 0.014), device=device),
           torch.tensor((0.399, 0.687, 0.214), device=device))
 
-  def forward(self, *img: torch.Tensor):
+  def forward(self, *img: torch.Tensor) -> Tuple[torch.Tensor]:
     rgb = self.dist.sample()
-    # img * rgb[None, :, None, None]
     return ((im * rgb[None, :, None, None]) / rgb.sum() for im in img)
 
 
-class GAN(pl.LightningModule):
+class VariationLoss(nn.Module):
+  def __init__(self, k_size: int) -> None:
+    super().__init__()
+    self.k_size = k_size
+
+  def forward(self, image: torch.Tensor):
+    b, c, h, w = image.shape
+    tv_h = torch.mean((image[:, :, self.k_size:, :] - image[:, :, : -self.k_size, :])**2)
+    tv_w = torch.mean((image[:, :, :, self.k_size:] - image[:, :, :, : -self.k_size])**2)
+    tv_loss = (tv_h + tv_w) / (3 * h * w)
+    return tv_loss
+
+
+class WhiteBoxGAN(pl.LightningModule):
+  SuperPixelDict = {
+      'slic': slic,
+      'adaptive_slic': adaptive_slic,
+      'sscolor': sscolor}
 
   def __init__(
       self,
@@ -103,6 +114,12 @@ class GAN(pl.LightningModule):
       lr_d: float = 2e-4,
       b1: float = 0.5,
       b2: float = 0.99,
+      tv_weight: float = 10000.0,
+      g_blur_weight: float = 0.1,
+      g_gray_weight: float = 0.1,
+      recon_weight: float = 200,
+      superpixel_fn: str = 'sscolor',
+      superpixel_kwarg: dict = {'seg_num': 200},
       pre_trained_ckpt: str = None,
       **kwargs
   ):
@@ -125,92 +142,102 @@ class GAN(pl.LightningModule):
     self.guided_filter = GuidedFilter()
     self.lsgan_loss = LSGanLoss()
     self.colorshift = ColorShift()
-    self.pretrained = VGGPreTrained()
+    self.pretrained = VGGCaffePreTrained()
     self.l1_loss = nn.L1Loss('mean')
+    self.variation_loss = VariationLoss(1)
+    self.superpixel_fn = partial(self.SuperPixelDict[superpixel_fn],
+                                 **superpixel_kwarg)
 
-  def on_train_start(self) -> None:
+  def on_fit_start(self):
     self.colorshift.setup(self.device)
     self.pretrained.setup(self.device)
 
   def forward(self, im):
     return self.generator(im)
 
-  def do_disc(self, model, real, fake):
-    real_logit = model(real)
-    fake_logit = model(fake)
-    return real_logit, fake_logit
+  def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx, optimizer_idx):
+    input_cartoon, input_photo = batch
 
-  def training_step(self, batch, batch_idx, optimizer_idx):
-    input_photo = batch['real_data']
-    input_cartoon = batch['anime_data']
-    # anime_gray_data = batch['anime_gray_data']
-    # anime_smooth_data = batch['anime_smooth_data']
-
-    if optimizer_idx == 0:  # get superpixel image
-      generator_img = self.generator(input_photo)
-      output: torch.Tensor = self.guided_filter(input_photo, generator_img, r=1)
-
-      self.step_input_superpixel: torch.Tensor = torch.from_numpy(
-          simple_superpixel(output.detach().cpu().transpose(1, 3).numpy(), seg_num=200)
-      ).to(self.device).transpose(1, 3)
-
-    elif optimizer_idx == 1:  # train generator
+    if optimizer_idx == 0:  # train generator
       generator_img = self.generator(input_photo)
       output = self.guided_filter(input_photo, generator_img, r=1)
+      # 1. blur for Surface Representation
       blur_fake = self.guided_filter(output, output, r=5, eps=2e-1)
-      blur_cartoon = self.guided_filter(input_cartoon, input_cartoon, r=5, eps=2e-1)
-      # FIXME 原论文叙述的colorshift接受的应该是generator_img输入，但是代码中是经过滤波的输出
-      gray_fake, gray_cartoon = self.colorshift(output, input_cartoon)
-      gray_real_logit, gray_fake_logit = self.do_disc(self.disc_gray, gray_cartoon, gray_fake)
-      blur_real_logit, blur_fake_logit = self.do_disc(self.disc_blur, blur_cartoon, blur_fake)
-      g_loss_gray = self.lsgan_loss._forward_g_loss(gray_real_logit, gray_fake_logit)
-      g_loss_blur = self.lsgan_loss._forward_g_loss(blur_real_logit, blur_fake_logit)
+      blur_fake_logit = self.disc_blur(blur_fake)
+      g_loss_blur = self.hparams.g_blur_weight * self.lsgan_loss._g_loss(blur_fake_logit)
 
-      vgg_photo = self.pretrained(input_photo)
+      # 2. gray for Textural Representation
+      gray_fake, = self.colorshift(output)
+      gray_fake_logit = self.disc_gray(gray_fake)
+      g_loss_gray = self.hparams.g_gray_weight * self.lsgan_loss._g_loss(gray_fake_logit)
+
+      # 3. superpixel for Structure Representation
+      input_superpixel = torch.from_numpy(
+          simple_superpixel(output.detach().permute((0, 2, 3, 1)).cpu().numpy(),
+                            self.superpixel_fn)
+      ).to(self.device).permute((0, 3, 1, 2))
+
       vgg_output = self.pretrained(output)
-      vgg_superpixel = self.pretrained(self.step_input_superpixel)
+      _, c, h, w = vgg_output.shape
+      vgg_superpixel = self.pretrained(input_superpixel)
+      superpixel_loss = self.l1_loss(vgg_superpixel, vgg_output) / (c * h * w)
 
-      photo_loss = self.l1_loss(vgg_photo, vgg_output)
-      superpixel_loss = self.l1_loss(vgg_superpixel, vgg_output)
-      recon_loss = photo_loss + superpixel_loss
-      tv_loss = self.variation_loss(output)
-      g_loss_total = 1e4 * tv_loss + 1e-1 * g_loss_blur + g_loss_gray + 2e2 * recon_loss
-      self.log_dict({'g_loss': g_loss_total,
-                     'tv_loss': 1e4 * tv_loss,
-                     'g_loss_blur': 1e-1 * g_loss_blur,
-                     'g_loss_gray': g_loss_gray,
-                     'recon_loss': 2e2 * recon_loss})
-      if batch_idx % 50 == 0:
-        self.log_images({'input': input_photo,
-                         'generate': generator_img,
-                         'output': output,
-                         'blur_fake': blur_fake,
-                         'blur_cartoon': blur_cartoon,
-                         'gray_fake': gray_fake,
-                         'gray_cartoon': gray_cartoon,
-                         'superpixel': self.step_input_superpixel})
+      # 4. Content loss
+      vgg_photo = self.pretrained(input_photo)
+      photo_loss = self.l1_loss(vgg_photo, vgg_output) / (c * h * w)
+      recon_loss = self.hparams.recon_weight * (photo_loss + superpixel_loss)
+
+      # 5. total variation loss
+      tv_loss = self.hparams.tv_weight * self.variation_loss(output)
+
+      g_loss_total = tv_loss + g_loss_blur + g_loss_gray + recon_loss
+      self.log_dict({'gen/g_loss': g_loss_total,
+                     'gen/tv_loss': tv_loss,
+                     'gen/g_loss_blur': g_loss_blur,
+                     'gen/g_loss_gray': g_loss_gray,
+                     'gen/recon_loss': recon_loss})
 
       return g_loss_total
-    elif optimizer_idx == 2:  # train discriminator
+    elif optimizer_idx == 1:  # train discriminator
       generator_img = self.generator(input_photo)
       output = self.guided_filter(input_photo, generator_img, r=1)
-      # NOTE blur_fake and blur_cartoon for Surface loss
+      # 1. blur for Surface Representation
       blur_fake = self.guided_filter(output, output, r=5, eps=2e-1)
       blur_cartoon = self.guided_filter(input_cartoon, input_cartoon, r=5, eps=2e-1)
-      blur_real_logit, blur_fake_logit = self.do_disc(self.disc_blur, blur_cartoon, blur_fake)
-      d_loss_blur = self.lsgan_loss._forward_d_loss(blur_real_logit, blur_fake_logit)
+      blur_real_logit = self.disc_blur(blur_cartoon)
+      blur_fake_logit = self.disc_blur(blur_fake)
+      d_loss_blur = self.lsgan_loss._d_loss(blur_real_logit, blur_fake_logit)
 
-      # NOTE blur_fake and blur_cartoon for Textural loss
+      # 2. gray for Textural Representation
       gray_fake, gray_cartoon = self.colorshift(output, input_cartoon)
-      gray_real_logit, gray_fake_logit = self.do_disc(self.disc_gray, gray_cartoon, gray_fake)
-      d_loss_gray = self.lsgan_loss._forward_d_loss(gray_real_logit, gray_fake_logit)
-      d_loss_total = d_loss_blur + d_loss_gray
+      gray_real_logit = self.disc_gray(gray_cartoon)
+      gray_fake_logit = self.disc_gray(gray_fake)
+      d_loss_gray = self.lsgan_loss._d_loss(gray_real_logit, gray_fake_logit)
 
-      self.log_dict({'d_loss': d_loss_total,
-                     'd_loss_blur': d_loss_blur,
-                     'd_loss_gray': d_loss_gray})
+      d_loss_total = d_loss_blur + d_loss_gray
+      self.log_dict({'dis/d_loss': d_loss_total,
+                     'dis/d_blur': d_loss_blur,
+                     'dis/d_gray': d_loss_gray})
 
       return d_loss_total
+
+  def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx):
+    input_photo = batch
+    generator_img = self.generator(input_photo)
+    output = self.guided_filter(input_photo, generator_img, r=1)
+    gray_fake, = self.colorshift(output)
+    input_superpixel = torch.from_numpy(
+        simple_superpixel(output.detach().permute((0, 2, 3, 1)).cpu().numpy(),
+                          self.superpixel_fn)
+    ).to(self.device).permute((0, 3, 1, 2))
+
+    log_images(self, {
+        'input/real': input_photo,
+        'input/superpix': input_superpixel,
+        'generate/anime': generator_img,
+        'generate/filtered': output,
+        'generate/gray': gray_fake,
+    })
 
   def configure_optimizers(self):
     lr_g = self.hparams.lr_g
@@ -220,9 +247,10 @@ class GAN(pl.LightningModule):
 
     opt_g = torch.optim.Adam(self.generator.parameters(), lr=lr_g, betas=(b1, b2))
     opt_d = torch.optim.Adam(itertools.chain(self.disc_blur.parameters(),
-                                             self.disc_gray.parameters()), lr=lr_d, betas=(b1, b2))
-    return [DummyOptimizer(), opt_g, opt_d], []
+                                             self.disc_gray.parameters()),
+                             lr=lr_d, betas=(b1, b2))
+    return [opt_g, opt_d], []
 
 
 if __name__ == "__main__":
-  run_train(GAN, AnimeGANDataModule)
+  run_train(WhiteBoxGAN, WhiteBoxGANDataModule)

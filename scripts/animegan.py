@@ -102,7 +102,7 @@ class AnimeGAN(pl.LightningModule):
     return 1.2 * real_loss, 1.2 * gray_loss, 1.2 * fake_loss, 0.8 * real_blur_loss
 
   def generator_loss(self, fake_logit):
-    return self.lsgan_loss._forward_g_loss(fake_logit)
+    return self.lsgan_loss._g_loss(fake_logit)
 
   def training_step(self, batch, batch_idx, optimizer_idx):
     input_photo, (input_cartoon, anime_gray_data), anime_smooth_gray_data = batch

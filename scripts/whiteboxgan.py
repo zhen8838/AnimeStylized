@@ -11,7 +11,6 @@ import torch.nn as nn
 import torch.nn.functional as nf
 import numpy as np
 from joblib import Parallel, delayed
-from optimizers import DummyOptimizer
 import itertools
 from torch.distributions import Distribution
 from scripts.common import run_train, log_images
@@ -180,22 +179,24 @@ class WhiteBoxGAN(pl.LightningModule):
       vgg_output = self.pretrained(output)
       _, c, h, w = vgg_output.shape
       vgg_superpixel = self.pretrained(input_superpixel)
-      superpixel_loss = self.l1_loss(vgg_superpixel, vgg_output) / (c * h * w)
+      superpixel_loss = (self.hparams.recon_weight *
+                         self.l1_loss(vgg_superpixel, vgg_output) / (c * h * w))
 
       # 4. Content loss
       vgg_photo = self.pretrained(input_photo)
-      photo_loss = self.l1_loss(vgg_photo, vgg_output) / (c * h * w)
-      recon_loss = self.hparams.recon_weight * (photo_loss + superpixel_loss)
+      photo_loss = self.hparams.recon_weight * self.l1_loss(vgg_photo, vgg_output) / (c * h * w)
 
       # 5. total variation loss
       tv_loss = self.hparams.tv_weight * self.variation_loss(output)
 
-      g_loss_total = tv_loss + g_loss_blur + g_loss_gray + recon_loss
+      g_loss_total = tv_loss + g_loss_blur + g_loss_gray + superpixel_loss + photo_loss
       self.log_dict({'gen/g_loss': g_loss_total,
                      'gen/tv_loss': tv_loss,
                      'gen/g_loss_blur': g_loss_blur,
                      'gen/g_loss_gray': g_loss_gray,
-                     'gen/recon_loss': recon_loss})
+                     'gen/photo_loss': photo_loss,
+                     'gen/superpixel_loss': superpixel_loss,
+                     })
 
       return g_loss_total
     elif optimizer_idx == 1:  # train discriminator

@@ -84,7 +84,7 @@ class FacePreTrained(PretrainNet):
     right = left + size
     batch_tensor = batch_tensor[:, :, top: bottom, left: right]
 
-    batch_tensor = F.interpolate(batch_tensor, size=[112, 112], mode='bilinear', align_corners=True)
+    batch_tensor = nf.interpolate(batch_tensor, size=[112, 112], mode='bilinear', align_corners=True)
 
     features = self.model(batch_tensor)
     return features
@@ -94,7 +94,7 @@ class FacePreTrained(PretrainNet):
     feature2 = self.infer(batch_tensor2)
     return 1 - torch.cosine_similarity(feature1, feature2)
 
-  def forwar(self, batch_tensor1, batch_tensor2):
+  def forward(self, batch_tensor1, batch_tensor2):
     return self.cosine_distance(batch_tensor1, batch_tensor2)
 
 

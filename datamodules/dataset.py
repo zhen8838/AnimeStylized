@@ -29,6 +29,27 @@ class ImageFolder(VisionDataset):
     return len(self.samples)
 
 
+class ImagePaths(VisionDataset):
+  def __init__(self, paths=List[str], transforms=None, transform=None, target_transform=None):
+    super().__init__('.', transforms, transform, target_transform)
+    self.loader = imread
+    self.samples = paths
+
+  def __len__(self) -> int:
+    return len(self.samples)
+
+  def __getitem__(self, index: int):
+    path = self.samples[index]
+    sample = self.loader(path)
+    if self.transform is not None:
+      sample = self.transform(sample)
+
+    return sample
+
+  def size(self, idx):
+    return len(self.samples)
+
+
 class MergeDataset(Dataset):
   def __init__(self, *tensors):
     """Merge two dataset to one Dataset

@@ -1,7 +1,8 @@
 import os
 import sys
 sys.path.insert(0, os.getcwd())
-from networks.gan import ResnetGenerator, AttentionDiscriminator, FaceFeatures, RhoClipper, WClipper
+from networks.gan import ResnetGenerator, AttentionDiscriminator, RhoClipper, WClipper
+from networks.pretrainnet import FacePreTrained
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
@@ -32,7 +33,7 @@ class UagtitGAN(pl.LightningModule):
     self.disGB = AttentionDiscriminator(input_nc=3, ndf=ch, n_layers=7)
     self.disLA = AttentionDiscriminator(input_nc=3, ndf=ch, n_layers=5)
     self.disLB = AttentionDiscriminator(input_nc=3, ndf=ch, n_layers=5)
-    self.facenet = FaceFeatures('models/model_mobilefacenet.pth')
+    self.facenet = FacePreTrained('models/model_mobilefacenet.pth')
 
     self.Rho_clipper = RhoClipper(0, rho_clipper)
     self.W_Clipper = WClipper(0, w_clipper)

@@ -5,7 +5,7 @@ import datamodules.dstransform as transforms
 
 
 class UagtitGanDataSet(pl.LightningDataModule):
-  def __init__(self, root: str, batch_size: int = 8, num_workers: int = 4):
+  def __init__(self, root: str, A_suffix='', B_suffix='', batch_size: int = 8, num_workers: int = 4):
     super().__init__()
     self.root = root
     self.batch_size = batch_size
@@ -22,23 +22,25 @@ class UagtitGanDataSet(pl.LightningDataModule):
         transforms.ToTensor(),
         transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
     ])
+    self.A_suffix = A_suffix
+    self.B_suffix = B_suffix
 
   def setup(self, stage=None):
     if stage == 'fit':
-      self.trainA = ImageFolder(self.root + '/trainA',
+      self.trainA = ImageFolder(self.root + '/trainA' + self.A_suffix,
                                 transform=self.train_transform)
-      self.trainB = ImageFolder(self.root + '/trainB',
+      self.trainB = ImageFolder(self.root + '/trainB' + self.B_suffix,
                                 transform=self.train_transform)
       self.ds_train = MergeDataset(self.trainA, self.trainB)
-      self.testA = ImageFolder(self.root + '/testA',
+      self.testA = ImageFolder(self.root + '/testA' + self.A_suffix,
                                transform=self.test_transform)
-      self.testB = ImageFolder(self.root + '/testB',
+      self.testB = ImageFolder(self.root + '/testB' + self.B_suffix,
                                transform=self.test_transform)
       self.ds_test = MergeDataset(self.testA, self.testB)
     else:
-      self.testA = ImageFolder(self.root + '/testA',
+      self.testA = ImageFolder(self.root + '/testA' + self.A_suffix,
                                transform=self.test_transform)
-      self.testB = ImageFolder(self.root + '/testB',
+      self.testB = ImageFolder(self.root + '/testB' + self.B_suffix,
                                transform=self.test_transform)
       self.ds_test = MergeDataset(self.testA, self.testB)
 

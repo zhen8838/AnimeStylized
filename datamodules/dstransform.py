@@ -120,8 +120,8 @@ class RandomCrop(object):
   def __init__(self, size):
     if isinstance(size, tuple):
       self.size = (int(size), int(size))
-    else:
-      self.size = size
+    elif isinstance(size, int):
+      self.size = (size, size)
 
   @staticmethod
   def get_params(img, output_size):

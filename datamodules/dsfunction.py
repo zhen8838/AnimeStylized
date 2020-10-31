@@ -75,17 +75,17 @@ def crop(img, top, left, height, width):
   return img[top:top + height, left:left + width]
 
 
-def reduce_hw(img_hw: List[int], min_hw: List[int]) -> Tuple[int]:
+def reduce_to_scale(img_hw: List[int], min_hw: List[int], scale: int) -> Tuple[int]:
   im_h, im_w = img_hw
   if im_h <= min_hw[0]:
     im_h = min_hw[0]
   else:
-    x = im_h % 32
+    x = im_h % scale
     im_h = im_h - x
 
   if im_w < min_hw[1]:
     im_w = min_hw[1]
   else:
-    y = im_w % 32
+    y = im_w % scale
     im_w = im_w - y
   return (im_h, im_w)

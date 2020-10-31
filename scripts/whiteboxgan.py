@@ -13,7 +13,7 @@ import numpy as np
 from joblib import Parallel, delayed
 import itertools
 from torch.distributions import Distribution
-from scripts.common import run_train, log_images
+from scripts.common import run_common, log_images
 from typing import List, Tuple
 from utils.superpix import slic, adaptive_slic, sscolor
 from functools import partial
@@ -127,15 +127,7 @@ class WhiteBoxGAN(pl.LightningModule):
 
     # networks
     self.generator = UnetGenerator()
-    if pre_trained_ckpt:
-      ckpt = torch.load(pre_trained_ckpt)
-      generatordict = dict(filter(lambda k: 'generator' in k[0], ckpt['state_dict'].items()))
-      generatordict = {k.split('.', 1)[1]: v for k, v in generatordict.items()}
-      self.generator.load_state_dict(generatordict, True)
-      del ckpt
-      del generatordict
-      print("Success load pretrained generator from", pre_trained_ckpt)
-
+    self.pre_trained_ckpt = pre_trained_ckpt
     self.disc_gray = SpectNormDiscriminator()
     self.disc_blur = SpectNormDiscriminator()
     self.guided_filter = GuidedFilter()
@@ -147,12 +139,27 @@ class WhiteBoxGAN(pl.LightningModule):
     self.superpixel_fn = partial(self.SuperPixelDict[superpixel_fn],
                                  **superpixel_kwarg)
 
+  def setup(self, stage: str):
+    if stage == 'fit':
+      if self.pre_trained_ckpt:
+        ckpt = torch.load(self.pre_trained_ckpt)
+        generatordict = dict(filter(lambda k: 'generator' in k[0], ckpt['state_dict'].items()))
+        generatordict = {k.split('.', 1)[1]: v for k, v in generatordict.items()}
+        self.generator.load_state_dict(generatordict, True)
+        del ckpt
+        del generatordict
+        print("Success load pretrained generator from", self.pre_trained_ckpt)
+    elif stage == 'test':
+      pass
+
   def on_fit_start(self):
     self.colorshift.setup(self.device)
     self.pretrained.setup(self.device)
 
-  def forward(self, im):
-    return self.generator(im)
+  def forward(self, input_photo) -> torch.Tensor:
+    generator_img = self.generator(input_photo)
+    output = self.guided_filter(input_photo, generator_img, r=1)
+    return output
 
   def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx, optimizer_idx):
     input_cartoon, input_photo = batch
@@ -192,8 +199,8 @@ class WhiteBoxGAN(pl.LightningModule):
       g_loss_total = tv_loss + g_loss_blur + g_loss_gray + superpixel_loss + photo_loss
       self.log_dict({'gen/g_loss': g_loss_total,
                      'gen/tv_loss': tv_loss,
-                     'gen/g_loss_blur': g_loss_blur,
-                     'gen/g_loss_gray': g_loss_gray,
+                     'gen/g_blur': g_loss_blur,
+                     'gen/g_gray': g_loss_gray,
                      'gen/photo_loss': photo_loss,
                      'gen/superpixel_loss': superpixel_loss,
                      })
@@ -223,9 +230,10 @@ class WhiteBoxGAN(pl.LightningModule):
       return d_loss_total
 
   def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx):
-    input_photo = batch
+    input_photo = torch.cat(batch)
     generator_img = self.generator(input_photo)
     output = self.guided_filter(input_photo, generator_img, r=1)
+    blur_fake = self.guided_filter(output, output, r=5, eps=2e-1)
     gray_fake, = self.colorshift(output)
     input_superpixel = torch.from_numpy(
         simple_superpixel(output.detach().permute((0, 2, 3, 1)).cpu().numpy(),
@@ -238,6 +246,7 @@ class WhiteBoxGAN(pl.LightningModule):
         'generate/anime': generator_img,
         'generate/filtered': output,
         'generate/gray': gray_fake,
+        'generate/blur': blur_fake,
     })
 
   def configure_optimizers(self):
@@ -253,5 +262,28 @@ class WhiteBoxGAN(pl.LightningModule):
     return [opt_g, opt_d], []
 
 
+def infer_fn(model: WhiteBoxGAN, image_path: str):
+  from datamodules.dsfunction import imread, denormalize
+  import datamodules.dstransform as transforms
+  from pathlib import Path
+  import cv2
+
+  infer_transform = transforms.Compose([
+      transforms.ResizeToScale((256, 256), 32),
+      transforms.ToTensor(),
+      transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+  ])
+  model.setup('test')
+  model.eval()
+
+  im = imread(image_path)
+  feed_im = infer_transform(im)
+  out_im = model.forward(feed_im[None, ...])[0]
+  draw_im = (denormalize(out_im.permute((1, 2, 0)).detach().numpy()) * 255).astype('uint8')
+  path = Path(image_path)
+  output_path = path.parent / (path.stem + '_out' + path.suffix)
+  cv2.imwrite(output_path.as_posix(), cv2.cvtColor(draw_im, cv2.COLOR_RGB2BGR))
+
+
 if __name__ == "__main__":
-  run_train(WhiteBoxGAN, WhiteBoxGANDataModule)
+  run_common(WhiteBoxGAN, WhiteBoxGANDataModule, infer_fn)

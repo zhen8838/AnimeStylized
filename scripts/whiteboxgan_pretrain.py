@@ -7,7 +7,7 @@ from datamodules.whiteboxgands import WhiteBoxGANDataModule
 from typing import Dict, List, Tuple
 import torch
 import torch.nn as nn
-from scripts.common import run_train, log_images
+from scripts.common import run_common, log_images
 from scripts.whiteboxgan import WhiteBoxGAN
 
 
@@ -37,4 +37,4 @@ class WhiteBoxGANPretrain(WhiteBoxGAN):
 
 
 if __name__ == "__main__":
-  run_train(WhiteBoxGANPretrain, WhiteBoxGANDataModule)
+  run_common(WhiteBoxGANPretrain, WhiteBoxGANDataModule)

@@ -61,9 +61,9 @@ class WhiteBoxGANDataModule(pl.LightningDataModule):
            MultiRandomSampler(face_ds)],
           self.sample_steps, self.batch_size)
 
-      self.ds_val = ConcatDataset([scenery_photo_val, face_photo_val])
+      self.ds_val = MergeDataset(scenery_photo_val, face_photo_val)
     else:
-      self.ds_val = ConcatDataset([scenery_photo_val, face_photo_val])
+      self.ds_val = MergeDataset(scenery_photo_val, face_photo_val)
 
   def train_dataloader(self):
     return DataLoader(self.ds_train,
@@ -72,9 +72,9 @@ class WhiteBoxGANDataModule(pl.LightningDataModule):
                       pin_memory=True)
 
   def val_dataloader(self):
-    return DataLoader(self.ds_val, shuffle=True,
+    return DataLoader(self.ds_val, sampler=MultiRandomSampler(self.ds_val),
                       batch_size=4, num_workers=4)
 
   def test_dataloader(self):
-    return DataLoader(self.ds_val, shuffle=True,
+    return DataLoader(self.ds_val, sampler=MultiRandomSampler(self.ds_val),
                       batch_size=4, num_workers=4)

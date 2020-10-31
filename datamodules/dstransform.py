@@ -5,6 +5,11 @@ import cv2
 import random
 
 
+class Compose(Compose):
+  def insert(self, index, value):
+    self.transforms.insert(index, value)
+
+
 class Add(object):
   """remove datamean
   """
@@ -71,10 +76,10 @@ class Grayscale(object):
 
 class Resize(object):
   """Resize the input cv2 Image to the given size.
-
+    NOTE size = [width,height]
   Args:
       size (sequence or int): Desired output size. If size is a sequence like
-          (h, w), output size will be matched to this. If size is an int,
+          (w, h), output size will be matched to this. If size is an int,
           smaller edge of the image will be matched to this number.
           i.e, if height > width, then image will be rescaled to
           (size * height / width, size)
@@ -106,6 +111,33 @@ class Resize(object):
 
   def __repr__(self):
     return self.__class__.__name__ + '(size={0}, interpolation={1})'.format(self.size, self.interpolation_str)
+
+
+class ResizeToScale(Resize):
+  def __init__(self, size: int, scale: int, interpolation='INTER_LINEAR'):
+    """Resize the input cv2 Image to the given minimum size according to scale
+
+
+    Args:
+        size (int): minimum [width,height]
+        scale (int): minimum scale
+        interpolation (str, optional): Defaults to 'INTER_LINEAR'.
+    """
+    assert isinstance(size, int) or (isinstance(size, tuple) and len(size) == 2)
+    self.scale = scale
+    self.size = size
+    self.interpolation = self.interpolation_dict[interpolation]
+    self.interpolation_str = interpolation
+
+  def __call__(self, img):
+    hw = img.shape[:2]
+    tagert_hw = F.reduce_to_scale(hw, self.size[::-1], self.scale)
+    return F.imresize(img, tagert_hw[::-1], self.interpolation)
+
+  def __repr__(self):
+    return self.__class__.__name__ + '(size={0},scale={1},interpolation={2})'.format(self.size,
+                                                                                     self.scale,
+                                                                                     self.interpolation_str)
 
 
 class RandomCrop(object):

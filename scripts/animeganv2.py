@@ -6,7 +6,7 @@ from datamodules.dsfunction import denormalize
 from losses.lsfunction import variation_loss, rgb2yuv
 from typing import Dict, List, Tuple
 import torch
-from scripts.common import run_train, log_images
+from scripts.common import run_common, log_images
 from scripts.animegan import AnimeGAN
 
 
@@ -67,4 +67,4 @@ class AnimeGANv2(AnimeGAN):
 
 
 if __name__ == "__main__":
-  run_train(AnimeGANv2, AnimeGANDataModule)
+  run_common(AnimeGANv2, AnimeGANDataModule)

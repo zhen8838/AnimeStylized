@@ -10,7 +10,7 @@ from losses.gan_loss import LSGanLoss
 from losses.lsfunction import variation_loss, rgb2yuv
 import torch
 import torch.nn as nn
-from scripts.common import run_train, log_images
+from scripts.common import run_common, log_images
 
 
 class AnimeGAN(pl.LightningModule):
@@ -156,4 +156,4 @@ class AnimeGAN(pl.LightningModule):
 
 
 if __name__ == "__main__":
-  run_train(AnimeGAN, AnimeGANDataModule)
+  run_common(AnimeGAN, AnimeGANDataModule)

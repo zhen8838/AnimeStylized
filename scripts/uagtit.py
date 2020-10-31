@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 from typing import Dict, Tuple
 from datamodules.uagtitds import UagtitGanDataSet
-from scripts.common import run_train, log_images
+from scripts.common import run_common, log_images
 import itertools
 
 
@@ -198,4 +198,4 @@ class UagtitGAN(pl.LightningModule):
 
 
 if __name__ == "__main__":
-  run_train(UagtitGAN, UagtitGanDataSet)
+  run_common(UagtitGAN, UagtitGanDataSet)

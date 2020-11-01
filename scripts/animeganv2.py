@@ -7,7 +7,7 @@ from losses.lsfunction import variation_loss, rgb2yuv
 from typing import Dict, List, Tuple
 import torch
 from scripts.common import run_common, log_images
-from scripts.animegan import AnimeGAN
+from scripts.animegan import AnimeGAN, infer_fn
 
 
 class AnimeGANv2(AnimeGAN):
@@ -67,4 +67,4 @@ class AnimeGANv2(AnimeGAN):
 
 
 if __name__ == "__main__":
-  run_common(AnimeGANv2, AnimeGANDataModule)
+  run_common(AnimeGANv2, AnimeGANDataModule, infer_fn)

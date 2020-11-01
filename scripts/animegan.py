@@ -2,7 +2,7 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
-from networks.gan import AnimeGeneratorLite, AnimeDiscriminator, UnetGenerator, SpectNormDiscriminator
+from networks.gan import AnimeGeneratorLite, AnimeDiscriminator, UnetGenerator, SpectNormDiscriminator, AnimeGenerator
 from networks.pretrainnet import VGGPreTrained, VGGCaffePreTrained
 from datamodules.animegands import AnimeGANDataModule
 from datamodules.dsfunction import denormalize
@@ -15,6 +15,7 @@ from scripts.common import run_common, log_images
 
 class AnimeGAN(pl.LightningModule):
   GeneratorDict = {
+      'AnimeGenerator': AnimeGenerator,
       'AnimeGeneratorLite': AnimeGeneratorLite,
       'UnetGenerator': UnetGenerator,
   }
@@ -48,22 +49,28 @@ class AnimeGAN(pl.LightningModule):
 
     # networks
     self.generator = self.GeneratorDict[generator_name]()
-    if pre_trained_ckpt:
-      ckpt = torch.load(pre_trained_ckpt)
-      generatordict = dict(filter(lambda k: 'generator' in k[0], ckpt['state_dict'].items()))
-      generatordict = {k.split('.', 1)[1]: v for k, v in generatordict.items()}
-      self.generator.load_state_dict(generatordict, True)
-      del ckpt
-      del generatordict
-      print("Success load pretrained generator from", pre_trained_ckpt)
-
+    self.pre_trained_ckpt = pre_trained_ckpt
     self.discriminator = self.DiscriminatorDict[discriminator_name]()
     self.lsgan_loss = LSGanLoss()
     self.pretrained = self.PreTrainedDict[pretrained_name]()
     self.l1_loss = nn.L1Loss()
     self.huber_loss = nn.SmoothL1Loss()
 
-  def on_train_start(self) -> None:
+  def setup(self, stage: str):
+    if stage == 'fit':
+      if self.pre_trained_ckpt:
+        ckpt = torch.load(self.pre_trained_ckpt)
+        generatordict = dict(filter(lambda k: 'generator' in k[0], ckpt['state_dict'].items()))
+        generatordict = {k.split('.', 1)[1]: v for k, v in generatordict.items()}
+        self.generator.load_state_dict(generatordict, True)
+        del ckpt
+        del generatordict
+        print("Success load pretrained generator from", self.pre_trained_ckpt)
+
+    elif stage == 'test':
+      pass
+
+  def on_fit_start(self) -> None:
     self.pretrained.setup(self.device)
 
   def forward(self, im):
@@ -155,5 +162,28 @@ class AnimeGAN(pl.LightningModule):
                       'generate/anime': self.generator(input_photo)})
 
 
+def infer_fn(model: AnimeGAN, image_path: str):
+  from datamodules.dsfunction import imread, denormalize
+  import datamodules.dstransform as transforms
+  from pathlib import Path
+  import cv2
+
+  infer_transform = transforms.Compose([
+      transforms.ResizeToScale((256, 256), 32),
+      transforms.ToTensor(),
+      transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+  ])
+  model.setup('test')
+  model.eval()
+
+  im = imread(image_path)
+  feed_im = infer_transform(im)
+  out_im = model.forward(feed_im[None, ...])[0]
+  draw_im = (denormalize(out_im.permute((1, 2, 0)).detach().numpy()) * 255).astype('uint8')
+  path = Path(image_path)
+  output_path = path.parent / (path.stem + '_out' + path.suffix)
+  cv2.imwrite(output_path.as_posix(), cv2.cvtColor(draw_im, cv2.COLOR_RGB2BGR))
+
+
 if __name__ == "__main__":
-  run_common(AnimeGAN, AnimeGANDataModule)
+  run_common(AnimeGAN, AnimeGANDataModule, infer_fn)

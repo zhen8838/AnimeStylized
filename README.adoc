@@ -1,0 +1,78 @@
+= Anime Stylize Collection
+:imagesdir: asset
+:experimental:
+
+== Environment
+
+[source,bash]
+----
+conda create -n torch python=3.8
+conda activate torch
+conda install pytorch==1.6.0 torchvision==0.7.0 cudatoolkit=10.1 -c pytorch
+pip install pytorch-lightning=1.0.2 opencv-python matplotlib joblib scikit-image torchsummary
+----
+
+
+== Algorithm
+
+.https://github.com/TachibanaYoshino/AnimeGANv2[AnimeGAN: A Novel Lightweight GAN for Photo Animation]
+[cols="^.^10,<.^80"]
+|===
+
+a| Setup 
+
+a| 
+
+. download dataset from https://github.com/TachibanaYoshino/AnimeGAN/releases/tag/dataset-1[here] and unzip
+
+. download pretrain VGG19 from https://drive.google.com/file/d/1j0jDENjdwxCDb36meP6-u5xDBzmKBOjJ/view?usp=sharing[here] and unzip
+
+
+|Train 
+
+a|
+
+* change **configs/animegan_pretrain.yaml** menu:dataset[root] to **your path**
+
+* change **configs/animeganv2.yaml** menu:dataset[root] to **your path**
+
+* pre-training generator 
+
+[source,bash]
+----
+make train CODE=scripts/animegan_pretrain.py CFG=configs/animegan_pretrain.yaml
+----
+
+* training generator (use kbd:[Ctrl+c] can stop)
+
+[source,bash]
+----
+make train CODE=scripts/animeganv2.py CFG=configs/animeganv2.yaml
+----
+
+* check progress 
+
+[source,bash]
+----
+make tensorboard LOGDIR=logs/animeganv2/
+----
+
+|test 
+
+a| 
+
+[source,bash]
+----
+make infer CODE=scripts/animeganv2.py  CKPT=logs/animeganv2/version_0/checkpoints/epoch=17.ckpt EXTRA=image_path:asset/animegan_test1.jpg
+
+make infer CODE=scripts/animeganv2.py  CKPT=logs/animeganv2/version_0/checkpoints/epoch=17.ckpt EXTRA=image_path:asset/animegan_test2.jpg
+----
+
+.2+| Result 
+
+a| image::animegan_test2.jpg[] 
+
+a| image::animegan_test2_out.jpg[] 
+
+|===
+

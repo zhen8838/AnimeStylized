@@ -75,13 +75,19 @@ class CusModelCheckpoint(ModelCheckpoint):
 
 
 def parser_args():
+  def nullable_str(s):
+    if s.lower() in ['null', 'none', '']:
+      return None
+    return s
+
   parser = argparse.ArgumentParser()
-  parser.add_argument('--config', type=str, help='config file path')
-  parser.add_argument('--stage', type=str, help='trian or test or others',
+  parser.add_argument('--config', type=nullable_str, help='config file path')
+  parser.add_argument('--stage', type=nullable_str, help='trian or test or others',
                       choices=['fit', 'test', 'infer'])
-  parser.add_argument('--ckpt', type=str, help='pretrained checkpoint file', default=None)
-  parser.add_argument('--extra', type=str,
-                      help='extra kwargs for infer, must be `a:b,c:d`', default=None)
+  parser.add_argument('--ckpt', type=nullable_str,
+                      help='pretrained checkpoint file', default='')
+  parser.add_argument('--extra', type=nullable_str,
+                      help='extra kwargs for infer, must be `a:b,c:d`', default='')
   return parser.parse_args()
 
 
@@ -92,7 +98,8 @@ def run_common(model_class: pl.LightningModule,
   model: pl.LightningModule = None
   """ build model """
   if args.stage in ['fit', 'test']:
-    config: dict = safe_load(args.config)
+    with open(args.config, 'r') as f:
+      config: dict = safe_load(f)
     if args.ckpt:
       print("Load from checkpoint", args.ckpt)
       model = model_class.load_from_checkpoint(args.ckpt, strict=False, **config['model'])

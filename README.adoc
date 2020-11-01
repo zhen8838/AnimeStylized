@@ -25,7 +25,7 @@ a|
 
 . download dataset from https://github.com/TachibanaYoshino/AnimeGAN/releases/tag/dataset-1[here] and unzip
 
-. download pretrain VGG19 from https://drive.google.com/file/d/1j0jDENjdwxCDb36meP6-u5xDBzmKBOjJ/view?usp=sharing[here] and unzip
+. download pretrain VGG19 from https://drive.google.com/file/d/1j0jDENjdwxCDb36meP6-u5xDBzmKBOjJ/view?usp=sharing[here] and unzip, then put it to `models/vgg19.npy`
 
 
 |Train 

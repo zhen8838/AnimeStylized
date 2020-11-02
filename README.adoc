@@ -24,6 +24,8 @@ a| Setup
 
 a| 
 
+. #If you just want to use it, **just skip** the following step#
+
 . download dataset from https://github.com/TachibanaYoshino/AnimeGAN/releases/tag/dataset-1[here] and unzip
 
 . download pretrain VGG19 from https://drive.google.com/file/d/1j0jDENjdwxCDb36meP6-u5xDBzmKBOjJ/view?usp=sharing[here] and unzip, then put it to `models/vgg19.npy`
@@ -61,6 +63,10 @@ make tensorboard LOGDIR=logs/animeganv2/
 |test 
 
 a| 
+
+. you can download my pretrained model from https://drive.google.com/drive/folders/1Bu5yIYBPGBlO4yNzUamhWdWs5o5gT1Rx?usp=sharing[here].
+
+. run test command(process video coming soon)
 
 [source,bash]
 ----

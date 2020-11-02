@@ -9,7 +9,7 @@
 conda create -n torch python=3.8
 conda activate torch
 conda install pytorch==1.6.0 torchvision==0.7.0 cudatoolkit=10.1 -c pytorch
-pip install pytorch-lightning=1.0.2 opencv-python matplotlib joblib scikit-image torchsummary
+pip install pytorch-lightning==1.0.2 opencv-python matplotlib joblib scikit-image torchsummary
 ----
 
 == Algorithm
@@ -81,3 +81,87 @@ a| image::animegan_test2_out.jpg[animegantestout,624,432,pdfwidth=50%,scaledwidt
 
 |===
 
+
+[NOTE]
+====
+. If you want to change style, you have run `scripts/animegan_datamean.py` get dataset mean difference, then change `configs/animeganv2.yaml` menu:dataset[data_mean].
+
+. 
+
+====
+
+
+
+.https://github.com/SystemErrorWang/White-box-Cartoonization[Learning to Cartoonize Using White-box Cartoon Representations]
+[cols="^.^5,<.^50,<.^50"]
+|===
+
+a| Setup 
+
+2+a| 
+
+. #If you just want to use it, **just skip** the following step#
+
+. download dataset from https://drive.google.com/file/d/10SGv_kbYhVLIC2hLlz2GBkHGAo0nec-3/view[here] and unzip
+
+. download pretrain VGG19 from https://drive.google.com/file/d/1j0jDENjdwxCDb36meP6-u5xDBzmKBOjJ/view?usp=sharing[here] and unzip, then put it to `models/vgg19.npy`
+
+
+|Train 
+
+2+a|
+
+* change **configs/whitebox_pretrain.yaml** menu:dataset[root] to **your path**
+
+* change **configs/whitebox.yaml** menu:dataset[root] to **your path**
+
+* pre-training generator 
+
+[source,bash]
+----
+make train CODE=scripts/whiteboxgan_pretrain.py CFG=configs/whitebox_pretrain.yaml
+----
+
+* training generator (use kbd:[Ctrl+c] can stop)
+
+[source,bash]
+----
+make train CODE=scripts/whiteboxgan.py CFG=configs/whitebox.yaml
+----
+
+* check progress 
+
+[source,bash]
+----
+make tensorboard LOGDIR=logs/whitebox
+----
+
+|test 
+
+2+a| 
+
+. you can download my pretrained model from https://drive.google.com/drive/folders/1Bu5yIYBPGBlO4yNzUamhWdWs5o5gT1Rx?usp=sharing[here].
+
+. run test command(process video coming soon)
+
+[source,bash]
+----
+make infer CODE=scripts/whiteboxgan.py \
+CKPT=logs/whitebox/version_0/checkpoints/epoch=4.ckpt \
+EXTRA=image_path:asset/whitebox_test.jpg
+----
+
+.2+| Result 
+
+a| image::whitebox_test.jpg[whiteboxtest,pdfwidth=50%,scaledwidth=50%]
+
+a| image::whitebox_test_out.jpg[whiteboxtestout,pdfwidth=50%,scaledwidth=50%]
+
+|===
+
+
+[NOTE]
+====
+. The menu:model[superpixel_fn] has a great influence on the style. The `slic,sscolor` refer from offical code. defualt use `sscolor`.
+
+====

@@ -267,6 +267,7 @@ def infer_fn(model: WhiteBoxGAN, image_path: str):
   import datamodules.dstransform as transforms
   from pathlib import Path
   import cv2
+  from utils.terminfo import INFO
 
   infer_transform = transforms.Compose([
       transforms.ResizeToScale((256, 256), 32),
@@ -283,6 +284,7 @@ def infer_fn(model: WhiteBoxGAN, image_path: str):
   path = Path(image_path)
   output_path = path.parent / (path.stem + '_out' + path.suffix)
   cv2.imwrite(output_path.as_posix(), cv2.cvtColor(draw_im, cv2.COLOR_RGB2BGR))
+  print(INFO, 'Convert', path, 'to', output_path)
 
 
 if __name__ == "__main__":

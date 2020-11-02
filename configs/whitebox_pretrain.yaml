@@ -1,0 +1,32 @@
+dataset:
+  root: /home/lxy/zhengqihang/cvpr_dataset/
+  scene_style: shinkai
+  face_style: pa_face
+  sample_steps: [5, 1]
+  batch_size: 32
+  num_workers: 32
+  normalize: True
+  totenor: True
+checkpoint:
+  # monitor: "loss"
+  save_top_k: -1
+  mode: "all"
+logger:
+  save_dir: "logs"
+  name: "whitebox_pre"
+  version: null
+model:
+  lr: 0.0002
+  b1: 0.5
+  b2: 0.99
+trainer:
+  gpus: 1
+  max_epochs: 2
+  benchmark: True
+  deterministic: True
+  val_check_interval: 200
+  limit_val_batches: 1
+  log_every_n_steps: 10
+
+# make train CODE=scripts/whiteboxgan_pretrain.py CFG=configs/whitebox_pretrain.yaml
+# make tensorboard

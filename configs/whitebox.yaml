@@ -1,0 +1,41 @@
+dataset:
+  root: /home/lxy/zhengqihang/cvpr_dataset/
+  scene_style: shinkai
+  face_style: pa_face
+  sample_steps: [5, 1]
+  batch_size: 16
+  num_workers: 16
+  normalize: True
+  totenor: True
+checkpoint:
+  # monitor: "d_loss"
+  save_top_k: -1
+  mode: "all"
+logger:
+  save_dir: "logs"
+  name: "whitebox"
+  version: null
+model:
+  lr_g: 0.0002
+  lr_d: 0.0002
+  b1: 0.5
+  b2: 0.99
+  tv_weight: 10000.0
+  g_blur_weight: 1.
+  g_gray_weight: 0.1
+  recon_weight: 200
+  superpixel_fn: sscolor
+  superpixel_kwarg:
+    seg_num: 200
+    power: 1.2
+  pre_trained_ckpt: logs/whitebox_pre/version_0/checkpoints/epoch=1.ckpt
+trainer:
+  gpus: 1
+  max_epochs: 20
+  benchmark: True
+  deterministic: True
+  val_check_interval: 500
+  limit_val_batches: 1
+  log_every_n_steps: 10
+# make train CODE=scripts/whiteboxgan.py CFG=configs/whitebox.yaml
+# make infer CODE=scripts/whiteboxgan.py CKPT=logs/whitebox/version_3/checkpoints/epoch\=14.ckpt EXTRA=image_path:tests/model_8.png

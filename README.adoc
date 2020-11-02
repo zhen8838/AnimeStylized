@@ -1,4 +1,4 @@
-= Anime Stylize Collection
+= Animation Stylization Collection
 :imagesdir: asset
 :experimental:
 

@@ -1,0 +1,40 @@
+dataset:
+  root: /home/lxy/zhengqihang/animedataset
+  style: Hayao
+  batch_size: 4
+  num_workers: 32
+  data_mean: [-4.4346957, -8.665916, 13.100612]
+  augment: False
+  normalize: True
+  totenor: True
+checkpoint:
+  # monitor: dis/d_loss
+  save_top_k: -1
+  mode: all
+logger:
+  save_dir: logs
+  name: animeganv2
+  version: null
+model:
+  lr_g: 0.00002
+  lr_d: 0.00004
+  g_adv_weight: 300.
+  d_adv_weight: 300.
+  con_weight: 1.5
+  sty_weight: 2.5
+  color_weight: 10.
+  tv_weight: 1.
+  pre_trained_ckpt: logs/animegan_pre/version_0/checkpoints/epoch=4.ckpt
+  generator_name: AnimeGenerator
+  discriminator_name: AnimeDiscriminator
+  pretrained_name: VGGCaffePreTrained
+trainer:
+  gpus: 1
+  max_epochs: 50
+  benchmark: True
+  deterministic: True
+  val_check_interval: 500
+  limit_val_batches: 1
+  log_every_n_steps: 10
+# make train CODE=scripts/animeganv2.py CFG=configs/animeganv2.yaml
+# make tensorboard LOGDIR=logs/animeganv2/

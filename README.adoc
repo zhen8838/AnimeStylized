@@ -12,6 +12,7 @@ conda install pytorch==1.6.0 torchvision==0.7.0 cudatoolkit=10.1 -c pytorch
 pip install pytorch-lightning=1.0.2 opencv-python matplotlib joblib scikit-image torchsummary
 ----
 
+tensorboard dev upload --logdir logs/animeganv2/version_0/events.out.tfevents.1604214007.zjsru712-07.262056.0 --name "animeganv2_v0" --description "animegan v2 training"
 
 == Algorithm
 
@@ -63,8 +64,6 @@ a|
 
 [source,bash]
 ----
-make infer CODE=scripts/animeganv2.py  CKPT=logs/animeganv2/version_0/checkpoints/epoch=17.ckpt EXTRA=image_path:asset/animegan_test1.jpg
-
 make infer CODE=scripts/animeganv2.py  CKPT=logs/animeganv2/version_0/checkpoints/epoch=17.ckpt EXTRA=image_path:asset/animegan_test2.jpg
 ----
 

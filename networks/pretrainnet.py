@@ -7,6 +7,7 @@ import torch.functional as F
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as nf
+from utils.terminfo import ERROR
 
 
 class ResNetPreTrained(PretrainNet):
@@ -84,7 +85,8 @@ class FacePreTrained(PretrainNet):
     right = left + size
     batch_tensor = batch_tensor[:, :, top: bottom, left: right]
 
-    batch_tensor = nf.interpolate(batch_tensor, size=[112, 112], mode='bilinear', align_corners=True)
+    batch_tensor = nf.interpolate(
+        batch_tensor, size=[112, 112], mode='bilinear', align_corners=True)
 
     features = self.model(batch_tensor)
     return features
@@ -105,9 +107,13 @@ class VGGCaffePreTrained(PretrainNet):
   def __init__(self, weights_path: str = 'models/vgg19.npy') -> None:
     super().__init__()
     # weights_path = 'models/vgg19.npy'
-    data_dict: dict = np.load(weights_path, encoding='latin1', allow_pickle=True).item()
-    self.features = self.make_layers(self.cfg, data_dict)
-    del data_dict
+    try:
+      data_dict: dict = np.load(weights_path, encoding='latin1', allow_pickle=True).item()
+      self.features = self.make_layers(self.cfg, data_dict)
+      del data_dict
+    except FileNotFoundError as e:
+      print(ERROR, "weights_path:", weights_path,
+            'does not exits!, if you want to training must download pretrained weights')
 
   def _process(self, x):
     # NOTE 图像范围为[-1~1]，先denormalize到0-1再归一化

@@ -12,12 +12,10 @@ conda install pytorch==1.6.0 torchvision==0.7.0 cudatoolkit=10.1 -c pytorch
 pip install pytorch-lightning=1.0.2 opencv-python matplotlib joblib scikit-image torchsummary
 ----
 
-tensorboard dev upload --logdir logs/animeganv2/version_0/events.out.tfevents.1604214007.zjsru712-07.262056.0 --name "animeganv2_v0" --description "animegan v2 training"
-
 == Algorithm
 
 .https://github.com/TachibanaYoshino/AnimeGANv2[AnimeGAN: A Novel Lightweight GAN for Photo Animation]
-[cols="^.^10,<.^80"]
+[cols="^.^5,<.^95"]
 |===
 
 a| Setup 
@@ -75,9 +73,9 @@ make infer CODE=scripts/animeganv2.py  CKPT=logs/animeganv2/version_0/checkpoint
 
 .2+| Result 
 
-a| image::animegan_test2.jpg[] 
+a| image::animegan_test2.jpg[animegantest,624,432,pdfwidth=50%,scaledwidth=50%]
 
-a| image::animegan_test2_out.jpg[] 
+a| image::animegan_test2_out.jpg[animegantestout,624,432,pdfwidth=50%,scaledwidth=50%]
 
 |===
 

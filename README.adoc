@@ -68,7 +68,9 @@ a|
 
 [source,bash]
 ----
-make infer CODE=scripts/animeganv2.py  CKPT=logs/animeganv2/version_0/checkpoints/epoch=17.ckpt EXTRA=image_path:asset/animegan_test2.jpg
+make infer CODE=scripts/animeganv2.py \
+CKPT=logs/animeganv2/version_0/checkpoints/epoch=17.ckpt \
+EXTRA=image_path:asset/animegan_test2.jpg
 ----
 
 .2+| Result 

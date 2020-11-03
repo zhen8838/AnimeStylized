@@ -1,6 +1,8 @@
 = Animation Stylization Collection
 :imagesdir: asset
+:icons: font
 :experimental:
+:toc:
 
 == Environment
 
@@ -169,43 +171,37 @@ a| image::whitebox_test_out.jpg[whiteboxtestout,pdfwidth=50%,scaledwidth=50%]
 | **Path** | **Description** 
 | AnimeStylized | Repository root folder
 | &boxvr;&nbsp; asset | Folder containing readme image assets
-| &boxvr;&nbsp; configs a| Folder containing configs defining model/data paramters, training hyperparamters. 
-
-[NOTE]
-====
-* Each algorithm has a corresponding config file. 
-* Config file uses the YAML format
-====
-
-| &boxvr;&nbsp; datamodules a| Folder with various dataset objects and transfroms.
-
-[NOTE]
-====
-* The `dataset.py`,`dsfunction.py`,`dstransform.py` contains common data module object's basic component
-* Basically, each algorithm has a corresponding `xxxds.py`
-====
-
+| &boxvr;&nbsp; <<anchor-configs,configs>> a| Folder containing configs defining model/data paramters, training hyperparamters. 
+| &boxvr;&nbsp; <<anchor-datamodules,datamodules>> a| Folder with various dataset objects and transfroms.
 | &boxvr;&nbsp; losses | Folder containing various loss functions for training, Only very general used loss functions are added here.
 
-| &boxvr; models a| Folder containing all the models and training objects
-
-[NOTE]
-====
-* Basically, each algorithm has a corresponding `xxxnet.py`
-* Now, only have the gan architecture model, in future maybe add more.
-====
-
+| &boxvr; <<anchor-models,models>> a| Folder containing all the models and training objects
 | &boxvr;&nbsp; optimizers | Folder with common used optimizers
-| &boxvr;&nbsp; scripts a| Folder with running scripts for training and inference
-
-[NOTE]
-====
-* Each algorithm has a corresponding `xxx.py`, implement the main training step and inference here
-* Each algorithm must add `run_common(xxxModule, xxxDataModule)` in main function, then you can use general trainer to training or testing
-====
-
+| &boxvr;&nbsp; <<anchor-scripts,scripts>> a| Folder with running scripts for training and inference
 | &boxvr;&nbsp; utils | Folder with various utility functions
 |===
+
+
+[NOTE]
+====
+[[anchor-configs]]configs::
+  * Each algorithm has a corresponding config file. 
+  * Config file uses the YAML format
+
+[[anchor-datamodules]]datamodules::
+  * The `dataset.py`,`dsfunction.py`,`dstransform.py` contains common data module object's basic component
+  * Basically, each algorithm has a corresponding `xxxds.py`
+
+[[anchor-models]]models::
+  * Basically, each algorithm has a corresponding `xxxnet.py`
+  * Now, only have the gan architecture model, in future maybe add more.
+
+[[anchor-scripts]]scripts::
+  * Each algorithm has a corresponding `xxx.py`, implement the main training step and inference here
+  * Each algorithm must add `run_common(xxxModule, xxxDataModule)` in main function, then you can use general trainer to training or testing
+
+
+====
 
 == Participation and Contribution
 

@@ -1,10 +1,15 @@
 = Animation Stylization Collection
 :imagesdir: asset
-:icons: font
+:tip-caption: 💡
+:note-caption: 📝
+:warning-caption: ⚠️
+:caution-caption: 🔔
+:important-caption: ❗
 :experimental:
 :toc:
 
 == Environment
+
 
 [source,bash]
 ----

@@ -14,7 +14,8 @@ pip install pytorch-lightning==1.0.2 opencv-python matplotlib joblib scikit-imag
 
 == Algorithm
 
-.https://github.com/TachibanaYoshino/AnimeGANv2[AnimeGAN: A Novel Lightweight GAN for Photo Animation]
+=== https://github.com/TachibanaYoshino/AnimeGANv2[AnimeGAN: A Novel Lightweight GAN for Photo Animation]
+
 [cols="^.^5,<.^95"]
 |===
 
@@ -22,7 +23,7 @@ a| Setup
 
 a| 
 
-. #If you just want to use it, **just skip** the following step#
+. [yellow]#If you just want to use it, **just skip** the following step#
 
 . download dataset from https://github.com/TachibanaYoshino/AnimeGAN/releases/tag/dataset-1[here] and unzip
 
@@ -81,18 +82,14 @@ a| image::animegan_test2_out.jpg[animegantestout,624,432,pdfwidth=50%,scaledwidt
 
 |===
 
-
 [NOTE]
 ====
 . If you want to change style, you have run `scripts/animegan_datamean.py` get dataset mean difference, then change `configs/animeganv2.yaml` menu:dataset[data_mean].
-
-. 
-
 ====
 
 
+=== https://github.com/SystemErrorWang/White-box-Cartoonization[Learning to Cartoonize Using White-box Cartoon Representations]
 
-.https://github.com/SystemErrorWang/White-box-Cartoonization[Learning to Cartoonize Using White-box Cartoon Representations]
 [cols="^.^5,<.^50,<.^50"]
 |===
 
@@ -100,7 +97,7 @@ a| Setup
 
 2+a| 
 
-. #If you just want to use it, **just skip** the following step#
+. [yellow]#If you just want to use it, **just skip** the following step#
 
 . download dataset from https://drive.google.com/file/d/10SGv_kbYhVLIC2hLlz2GBkHGAo0nec-3/view[here] and unzip
 
@@ -163,5 +160,57 @@ a| image::whitebox_test_out.jpg[whiteboxtestout,pdfwidth=50%,scaledwidth=50%]
 [NOTE]
 ====
 . The menu:model[superpixel_fn] has a great influence on the style. The `slic,sscolor` refer from offical code. defualt use `sscolor`.
-
 ====
+
+== Repository structure
+
+[%autowidth,cols="<.^,<.^"]
+|===
+| **Path** | **Description** 
+| AnimeStylized | Repository root folder
+| &boxvr;&nbsp; asset | Folder containing readme image assets
+| &boxvr;&nbsp; configs a| Folder containing configs defining model/data paramters, training hyperparamters. 
+
+[NOTE]
+====
+* Each algorithm has a corresponding config file. 
+* Config file uses the YAML format
+====
+
+| &boxvr;&nbsp; datamodules a| Folder with various dataset objects and transfroms.
+
+[NOTE]
+====
+* The `dataset.py`,`dsfunction.py`,`dstransform.py` contains common data module object's basic component
+* Basically, each algorithm has a corresponding `xxxds.py`
+====
+
+| &boxvr;&nbsp; losses | Folder containing various loss functions for training, Only very general used loss functions are added here.
+
+| &boxvr; models a| Folder containing all the models and training objects
+
+[NOTE]
+====
+* Basically, each algorithm has a corresponding `xxxnet.py`
+* Now, only have the gan architecture model, in future maybe add more.
+====
+
+| &boxvr;&nbsp; optimizers | Folder with common used optimizers
+| &boxvr;&nbsp; scripts a| Folder with running scripts for training and inference
+
+[NOTE]
+====
+* Each algorithm has a corresponding `xxx.py`, implement the main training step and inference here
+* Each algorithm must add `run_common(xxxModule, xxxDataModule)` in main function, then you can use general trainer to training or testing
+====
+
+| &boxvr;&nbsp; utils | Folder with various utility functions
+|===
+
+== Participation and Contribution
+
+. Add custom `LightningDataModule` object as `xxxds.py` in `datamodules` dir.
+. Add custom `Module` object model architecture as `xxxnet.py` in `networks` dir.
+. Add custom `LightningDataModule` training script as `xxx.py` in `scripts` dir
+. Add config file in `configs` dir, the paramters follow your custom `LightningModule` and `LightningDataModule`
+. trianing your algorithm

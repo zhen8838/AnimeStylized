@@ -37,11 +37,41 @@ class ResNetPreTrained(PretrainNet):
 
 
 class VGGPreTrained(PretrainNet):
-  def __init__(self):
+  def __init__(self, output_index: int = 26):
+    """pytorch vgg pretrained net
+
+    Args:
+        output_index (int, optional): output layers index. Defaults to 26. 
+        NOTE the finally output layer name is `output_index-1`
+        ```
+          (0): Conv2d (1): ReLU
+          (2): Conv2d (3): ReLU
+          (4): MaxPool2d
+          (5): Conv2d (6): ReLU 
+          (7): Conv2d (8): ReLU
+          (9): MaxPool2d
+          (10): Conv2d (11): ReLU
+          (12): Conv2d (13): ReLU
+          (14): Conv2d (15): ReLU
+          (16): Conv2d (17): ReLU
+          (18): MaxPool2d
+          (19): Conv2d (20): ReLU 
+          (21): Conv2d (22): ReLU
+          (23): Conv2d (24): ReLU
+          (25): Conv2d (26): ReLU
+          (27): MaxPool2d
+          (28): Conv2d (29): ReLU
+          (30): Conv2d (31): ReLU
+          (32): Conv2d (33): ReLU
+          (34): Conv2d (35): ReLU
+          (36): MaxPool2d
+        ```
+    """
     super().__init__()
-    self.vgg = torchvision.models.vgg19(pretrained=True)
-    del self.vgg.avgpool
-    del self.vgg.classifier
+    vgg = torchvision.models.vgg19(pretrained=True)
+    self.features = vgg.features
+    self.output_index = output_index
+    del vgg
 
   def _process(self, x):
     # NOTE 图像范围为[-1~1]，先denormalize到0-1再归一化
@@ -59,7 +89,7 @@ class VGGPreTrained(PretrainNet):
     x = self._process(x)
     # See note [TorchScript super()]
     # NOTE get output with out relu activation
-    x = self.vgg.features[:26](x)
+    x = self.features[:self.output_index](x)
     # x = self.avgpool(x)
     # x = torch.flatten(x, 1)
     # x = self.fc(x)
@@ -104,9 +134,8 @@ class VGGCaffePreTrained(PretrainNet):
   cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256,
          'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M']
 
-  def __init__(self, weights_path: str = 'models/vgg19.npy') -> None:
+  def __init__(self, weights_path: str = 'models/vgg19.npy', output_index: int = 26) -> None:
     super().__init__()
-    # weights_path = 'models/vgg19.npy'
     try:
       data_dict: dict = np.load(weights_path, encoding='latin1', allow_pickle=True).item()
       self.features = self.make_layers(self.cfg, data_dict)
@@ -114,6 +143,7 @@ class VGGCaffePreTrained(PretrainNet):
     except FileNotFoundError as e:
       print(ERROR, "weights_path:", weights_path,
             'does not exits!, if you want to training must download pretrained weights')
+    self.output_index = output_index
 
   def _process(self, x):
     # NOTE 图像范围为[-1~1]，先denormalize到0-1再归一化
@@ -130,7 +160,7 @@ class VGGCaffePreTrained(PretrainNet):
   def _forward_impl(self, x):
     x = self._process(x)
     # NOTE get output with out relu activation
-    x = self.features[:26](x)
+    x = self.features[:self.output_index](x)
     return x
 
   def forward(self, x):

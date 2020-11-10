@@ -16,7 +16,7 @@
 conda create -n torch python=3.8
 conda activate torch
 conda install pytorch==1.6.0 torchvision==0.7.0 cudatoolkit=10.1 -c pytorch
-pip install pytorch-lightning==1.0.2 opencv-python matplotlib joblib scikit-image torchsummary
+pip install pytorch-lightning==1.0.2 opencv-python matplotlib joblib scikit-image torchsummary webdataset albumentations
 ----
 
 == Algorithm

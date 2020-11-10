@@ -1,4 +1,4 @@
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, GPUStatsMonitor, GradientAccumulationScheduler, LearningRateMonitor
 from pytorch_lightning.loggers import TensorBoardLogger
 import pytorch_lightning as pl
 from yaml import safe_load
@@ -10,6 +10,13 @@ from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zer
 from typing import Dict
 import torchvision
 import argparse
+
+CALLBACKDICT = {
+    'EarlyStopping': EarlyStopping,
+    'GPUStatsMonitor': GPUStatsMonitor,
+    'GradientAccumulationScheduler': GradientAccumulationScheduler,
+    'LearningRateMonitor': LearningRateMonitor,
+}
 
 
 def log_images(cls: pl.LightningModule,
@@ -70,7 +77,7 @@ class CusModelCheckpoint(ModelCheckpoint):
     """ do not save when after validation"""
     pass
 
-  def on_train_end(self, trainer, pl_module):
+  def on_train_epoch_end(self, trainer, pl_module, outputs):
     self.save_checkpoint(trainer, pl_module)
 
 
@@ -83,7 +90,7 @@ def parser_args():
   parser = argparse.ArgumentParser()
   parser.add_argument('--config', type=nullable_str, help='config file path')
   parser.add_argument('--stage', type=nullable_str, help='trian or test or others',
-                      choices=['fit', 'test', 'infer'])
+                      choices=['fit', 'test', 'infer', 'export'])
   parser.add_argument('--ckpt', type=nullable_str,
                       help='pretrained checkpoint file', default='')
   parser.add_argument('--extra', type=nullable_str,
@@ -91,9 +98,19 @@ def parser_args():
   return parser.parse_args()
 
 
+def parser_extra_args(args: str) -> dict:
+  kwargs = {}
+  for line in args.split(','):
+    k, v = line.split(':')
+    kwargs.setdefault(k, v)
+  return kwargs
+
+
 def run_common(model_class: pl.LightningModule,
                datamodule_class: pl.LightningDataModule,
-               infer_fn: callable = lambda x, arg: print("do nothing~")):
+               infer_fn: callable = lambda x, arg: print("infer_fn do nothing~"),
+               export_fn: callable = lambda x, arg: print("export_fn do nothing~")
+               ):
   args = parser_args()
   model: pl.LightningModule = None
   """ build model """
@@ -108,6 +125,13 @@ def run_common(model_class: pl.LightningModule,
     datamodule = datamodule_class(**config['dataset'])
     ckpt_callback = CusModelCheckpoint(**config['checkpoint'])
     logger = TensorBoardLogger(**config['logger'])
+    callbacks = None
+    if 'callbacks' in config.keys():
+      if config['callbacks'] is not None:
+        callbacks = []
+        for k, v in config['callbacks'].items():
+          callbacks.append(CALLBACKDICT[k](**v))
+
     trainer = pl.Trainer(checkpoint_callback=ckpt_callback,
                          logger=logger,
                          **config['trainer'])
@@ -118,11 +142,13 @@ def run_common(model_class: pl.LightningModule,
   elif args.stage == 'infer':
     print("Load from checkpoint", args.ckpt)
     model = model_class.load_from_checkpoint(args.ckpt, strict=False)
-    kwargs = {}
-    for line in args.extra.split(','):
-      k, v = line.split(':')
-      kwargs.setdefault(k, v)
+    kwargs = parser_extra_args(args.extra)
     infer_fn(model, **kwargs)
+  elif args.stage == 'export':
+    print("Load from checkpoint", args.ckpt)
+    model = model_class.load_from_checkpoint(args.ckpt, strict=False)
+    kwargs = parser_extra_args(args.extra)
+    export_fn(model, **kwargs)
 
 
 if __name__ == "__main__":

@@ -26,5 +26,3 @@ class PretrainNet(pl.LightningModule):
 
   def setup(self, device: torch.device):
     self.freeze()
-
-

@@ -16,5 +16,8 @@ test:
 infer:
 	python ${CODE} --config None --stage infer --ckpt ${CKPT} --extra ${EXTRA}
 
+export:
+	python ${CODE} --config None --stage export --ckpt ${CKPT} --extra ${EXTRA}
+
 tensorboard:
 	tensorboard --logdir ${LOGDIR} --samples_per_plugin images=0

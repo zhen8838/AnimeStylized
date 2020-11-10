@@ -2,10 +2,31 @@ from torchvision.datasets import VisionDataset
 from datamodules.dsfunction import imread
 from torch.utils.data import Dataset, RandomSampler, Sampler, DataLoader, TensorDataset, random_split, ConcatDataset
 import os
+import glob
 from typing import List, Sequence, Tuple
 from itertools import cycle, islice
 import torch
 from math import ceil
+
+
+class DataFolder(VisionDataset):
+  def __init__(self, root, loader: callable, pattern: str, transforms=None, transform=None, target_transform=None):
+    super().__init__(root, transforms, transform, target_transform)
+    self.loader = loader
+    self.samples = glob.glob(os.path.join(root, pattern))
+
+  def __len__(self) -> int:
+    return len(self.samples)
+
+  def __getitem__(self, index: int):
+    path = self.samples[index]
+    data_dict = self.loader(path)
+    if self.transform is not None:
+      sample = self.transform(**data_dict)
+    return sample
+
+  def size(self, idx):
+    return len(self.samples)
 
 
 class ImageFolder(VisionDataset):

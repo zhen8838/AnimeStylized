@@ -37,16 +37,3 @@ if __name__ == "__main__":
           json = stream.read()
         key = id.name
         f.write({'__key__': key, 'jpg': image, 'json': json})
-
-  """
-  cd /media/zqh/Documents/facelandmark_dataset/
-  sync
-  tar --sort=name -cf train.tar train/
-  sync
-  tar --sort=name -cf test.tar test/
-  sync
-  rm -rf train test
-  tar -tf train.tar | wc -l
-  tar -tf test.tar | wc -l
-  """
-  # os.system("tar -tf /media/zqh/Documents/facelandmark_dataset/test.tar | wc -l")

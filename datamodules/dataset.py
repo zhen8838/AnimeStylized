@@ -20,9 +20,9 @@ class DataFolder(VisionDataset):
 
   def __getitem__(self, index: int):
     path = self.samples[index]
-    data_dict = self.loader(path)
+    sample = self.loader(path)
     if self.transform is not None:
-      sample = self.transform(**data_dict)
+      sample = self.transform(**sample)
     return sample
 
   def size(self, idx):

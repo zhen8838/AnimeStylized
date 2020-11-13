@@ -277,14 +277,25 @@ def infer_fn(model: WhiteBoxGAN, image_path: str):
   model.setup('test')
   model.eval()
 
-  im = imread(image_path)
-  feed_im = infer_transform(im)
-  out_im = model.forward(feed_im[None, ...])[0]
-  draw_im = (denormalize(out_im.permute((1, 2, 0)).detach().numpy()) * 255).astype('uint8')
-  path = Path(image_path)
-  output_path = path.parent / (path.stem + '_out' + path.suffix)
-  cv2.imwrite(output_path.as_posix(), cv2.cvtColor(draw_im, cv2.COLOR_RGB2BGR))
-  print(INFO, 'Convert', path, 'to', output_path)
+  def infer_one_image(image_path: Path, output_root: partial):
+    im = imread(image_path.as_posix())
+    feed_im = infer_transform(im)
+    out_im = model.forward(feed_im[None, ...])[0]
+    draw_im = (denormalize(out_im.permute((1, 2, 0)).detach().numpy()) * 255).astype('uint8')
+    output_path = output_root / (image_path.stem + '_out' + image_path.suffix)
+    cv2.imwrite(output_path.as_posix(), cv2.cvtColor(draw_im, cv2.COLOR_RGB2BGR))
+    print(INFO, 'Convert', image_path, 'to', output_path)
+
+  image_path = Path(image_path)
+  if image_path.is_file():
+    output_root = image_path.parent
+    infer_one_image(image_path, output_root)
+  elif image_path.is_dir():
+    output_root: Path = image_path.parent / (image_path.name + '_out')
+    if not output_root.exists():
+      output_root.mkdir()
+    for p in image_path.iterdir():
+      infer_one_image(p, output_root)
 
 
 if __name__ == "__main__":

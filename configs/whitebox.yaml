@@ -27,7 +27,7 @@ model:
   superpixel_fn: sscolor
   superpixel_kwarg:
     seg_num: 200
-    power: 1.2
+    power: 1.
   pre_trained_ckpt: logs/whitebox_pre/version_0/checkpoints/epoch=1.ckpt
 trainer:
   gpus: 1

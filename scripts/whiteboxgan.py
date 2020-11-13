@@ -247,7 +247,7 @@ class WhiteBoxGAN(pl.LightningModule):
         'generate/filtered': output,
         'generate/gray': gray_fake,
         'generate/blur': blur_fake,
-    })
+    }, num=8)
 
   def configure_optimizers(self):
     lr_g = self.hparams.lr_g

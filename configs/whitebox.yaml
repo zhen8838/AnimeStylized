@@ -2,7 +2,7 @@ dataset:
   root: /home/lxy/zhengqihang/cvpr_dataset/
   scene_style: shinkai
   face_style: pa_face
-  sample_steps: [5, 1]
+  sample_steps: [4, 1] # mod(iter,5)==0 train face
   batch_size: 16
   num_workers: 16
   normalize: True

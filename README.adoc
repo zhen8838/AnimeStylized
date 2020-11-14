@@ -144,7 +144,7 @@ make tensorboard LOGDIR=logs/whitebox
 
 2+a| 
 
-. you can download my pretrained model from https://drive.google.com/drive/folders/1Bu5yIYBPGBlO4yNzUamhWdWs5o5gT1Rx?usp=sharing[here].
+. you can download my pretrained model from https://drive.google.com/drive/folders/1Bu5yIYBPGBlO4yNzUamhWdWs5o5gT1Rx?usp=sharing[here]. you can use choice `whitebox-v2.zip` or `whitebox.zip`
 
 . run test command(process video coming soon)
 
@@ -152,8 +152,9 @@ make tensorboard LOGDIR=logs/whitebox
 ----
 make infer CODE=scripts/whiteboxgan.py \
 CKPT=logs/whitebox/version_0/checkpoints/epoch=4.ckpt \
-EXTRA=image_path:asset/whitebox_test.jpg
+EXTRA=image_path:asset/whitebox_test.jpg # <1>
 ----
+<1> The `EXTRA` paramter can pass `image path` or `image directory path`
 
 .2+| Result 
 
@@ -167,6 +168,7 @@ a| image::whitebox_test_out.jpg[whiteboxtestout,pdfwidth=50%,scaledwidth=50%]
 [NOTE]
 ====
 . The menu:model[superpixel_fn] has a great influence on the style. The `slic,sscolor` refer from offical code. defualt use `sscolor`.
+. Pytorch version and official version compare results in https://github.com/zhen8838/AnimeStylized/issues/2#issuecomment-726512435[here]
 ====
 
 == Repository structure

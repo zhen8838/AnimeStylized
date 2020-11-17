@@ -1,0 +1,35 @@
+dataset:
+  root: /home/lxy/zhengqihang/photo2cartoon_resources_20200504/cartoon_data
+  batch_size: 1
+  num_workers: 16
+checkpoint:
+  # monitor: dis/d_loss
+  save_top_k: -1
+  mode: all
+logger:
+  save_dir: logs
+  name: uagtit
+  version: null
+model:
+  lr: 0.0001
+  adv_weight: 1
+  cycle_weight: 50
+  identity_weight: 10
+  cam_weight: 1000
+  faceid_weight: 1
+  rho_clipper: 1
+  w_clipper: 1
+  ch: 32
+  light: True
+trainer:
+  gpus: 1
+  max_epochs: 50
+  benchmark: True
+  deterministic: True
+  val_check_interval: 500
+  log_every_n_steps: 10
+  limit_val_batches: 1
+  # limit_train_batches: 0.1
+# make train CODE=scripts/uagtit.py CFG=configs/uagtit.yaml
+# make infer CODE=scripts/uagtit.py CKPT=logs/uagtit/version_13/checkpoints/epoch=15.ckpt EXTRA=image_path:tests/model_image_faces/model_1.png
+# make tensorboard LOGDIR=logs/uagtit

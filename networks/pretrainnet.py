@@ -1,6 +1,7 @@
 from .commons import PretrainNet
 import torchvision
 from .gan.mobilefacenet import MobileFaceNet
+from .regress import Res18landmarkNet
 import torch
 from datamodules.dsfunction import denormalize, normalize
 import torch.functional as F
@@ -8,6 +9,110 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as nf
 from utils.terminfo import ERROR
+from typing import List, Tuple, Dict
+import types
+
+
+class StopForward(Exception):
+  """The pretrain model forward stop signal
+  """
+  pass
+
+
+def named_basic_children(model: nn.Module, prefix='') -> List[Tuple[str, nn.Module]]:
+  """Extract model basic module class object
+
+  Args:
+      model (nn.Module): model
+      prefix (str, optional): Defaults to ''.
+
+  Returns:
+      List[Tuple[str, nn.Module]]: [(name,basic_module_object)]
+  """
+  named_basic = []
+
+  def inner_children(model, prefix=''):
+    named_children = list(model.named_children())
+    if len(named_children) == 0:
+      named_basic.append((prefix, model))
+    for name, children in named_children:
+      inner_children(children, prefix + ('.' if prefix else '') + name)
+
+  inner_children(model, prefix)
+  # rename list for beautiful print
+  for i, (name, mod) in enumerate(named_basic):
+    s = str(mod.__class__).split('.')[-1].split('\'')[0]
+    named_basic[i] = (f'{s}-{i}', mod)
+  return named_basic
+
+
+def featrue_extract_wrapper(model: nn.Module,
+                            output_index: int,
+                            extract_tuple: bool = False
+                            ) -> List[str]:
+  """ extract featrue from any basic layer
+    NOTE:
+      1. This function will modify model forward inplace!
+      2. The model must use `_forward_impl` method
+      3. When extracted featrue num == 1, model will retrun tensor.
+  Args:
+      model (nn.Module): main model
+      output_index (int): output index int or list[int]
+      extract_tuple (bool, optional): weather convert tuple to value. Defaults to False.
+
+  Raises:
+      StopForward: stop froward signial
+
+  Returns:
+      List[str]: extracted_name list
+  """
+  names: List[str] = []
+  basics: List[nn.Module] = []
+  named_basic = named_basic_children(model)
+  for name, basic in named_basic:
+    names.append(name)
+    basics.append(basic)
+
+  del named_basic
+
+  # for multi-featrue outputs
+  output_indexs: List[int] = None
+  if isinstance(output_index, int):
+    output_indexs = [output_index]
+  else:
+    output_indexs = output_index
+
+  # add hook
+  extracted_features = {}
+  extracted_num = len(output_indexs)
+  extracted_name: List[str] = []
+  extracted_count = 0
+
+  for i, idx in enumerate(output_indexs):
+
+    def hook(module: nn.Module, input: torch.Tensor):
+      if not extract_tuple:
+        input = input[0]
+      extracted_features[names[idx]] = input
+      if extracted_count == extracted_num:
+        raise StopForward
+
+    basics[idx].register_forward_pre_hook(hook)
+    extracted_count += 1
+    extracted_name.append(names[idx])
+
+  # overwrite model forwar function
+  def forward(self, x):
+    try:
+      y = self._forward_impl(x)
+    except StopForward as e:
+      if extracted_num == 1:
+        return extracted_features[extracted_name[0]]
+      else:
+        return extracted_features
+    return y
+  model.forward = types.MethodType(forward, model)
+  return extracted_name
 
 
 class ResNetPreTrained(PretrainNet):
@@ -32,22 +137,19 @@ class ResNetPreTrained(PretrainNet):
     # x = self.fc(x)
     return x
 
-  def forward(self, x):
-    return self._forward_impl(x)
-
 
 class VGGPreTrained(PretrainNet):
-  def __init__(self, output_index: int = 26):
+  def __init__(self):
     """pytorch vgg pretrained net
 
     Args:
-        output_index (int, optional): output layers index. Defaults to 26. 
+        output_index (int, optional): output layers index. Defaults to 26.
         NOTE the finally output layer name is `output_index-1`
         ```
           (0): Conv2d (1): ReLU
           (2): Conv2d (3): ReLU
           (4): MaxPool2d
-          (5): Conv2d (6): ReLU 
+          (5): Conv2d (6): ReLU
           (7): Conv2d (8): ReLU
           (9): MaxPool2d
           (10): Conv2d (11): ReLU
@@ -55,7 +157,7 @@ class VGGPreTrained(PretrainNet):
           (14): Conv2d (15): ReLU
           (16): Conv2d (17): ReLU
           (18): MaxPool2d
-          (19): Conv2d (20): ReLU 
+          (19): Conv2d (20): ReLU
           (21): Conv2d (22): ReLU
           (23): Conv2d (24): ReLU
           (25): Conv2d (26): ReLU
@@ -70,7 +172,6 @@ class VGGPreTrained(PretrainNet):
     super().__init__()
     vgg = torchvision.models.vgg19(pretrained=True)
     self.features = vgg.features
-    self.output_index = output_index
     del vgg
 
   def _process(self, x):
@@ -89,14 +190,15 @@ class VGGPreTrained(PretrainNet):
     x = self._process(x)
     # See note [TorchScript super()]
     # NOTE get output with out relu activation
-    x = self.features[:self.output_index](x)
+    x = self.features(x)
     # x = self.avgpool(x)
     # x = torch.flatten(x, 1)
     # x = self.fc(x)
     return x
 
-  def forward(self, x):
-    return self._forward_impl(x)
+  def get_name_list(self):
+    named_children = list(self.features.named_children())
+    return [name + '_' + mod._get_name() for name, mod in named_children]
 
 
 class FacePreTrained(PretrainNet):
@@ -130,11 +232,37 @@ class FacePreTrained(PretrainNet):
     return self.cosine_distance(batch_tensor1, batch_tensor2)
 
 
+class Res18FaceLandmarkPreTrained(PretrainNet):
+  def __init__(self, weights_path='models/facelandmark_full.pth'):
+    super().__init__()
+    self.model = Res18landmarkNet(landmark_num=5, pretrained=False)
+    self.model.load_state_dict(torch.load(weights_path))
+
+  def _process(self, x):
+    # NOTE 图像范围为[-1~1]，先denormalize到0-1再归一化
+    return self.normalize(denormalize(x))
+
+  def setup(self, device: torch.device):
+    mean: torch.Tensor = torch.tensor([0.485, 0.456, 0.406], device=device)
+    std = torch.tensor([0.229, 0.224, 0.225], device=device)
+    mean = mean[None, :, None, None]
+    std = std[None, :, None, None]
+    self.normalize = lambda x: normalize(x, mean, std)
+    self.freeze()
+
+  def _forward_impl(self, x):
+    x = self._process(x)
+    x = self.model(x)
+    pred = torch.sigmoid(x)
+    # NOTE get output [batch,n_landmark,2]
+    return torch.reshape(pred, (-1, 5, 2))
+
+
 class VGGCaffePreTrained(PretrainNet):
   cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256,
          'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M']
 
-  def __init__(self, weights_path: str = 'models/vgg19.npy', output_index: int = 26) -> None:
+  def __init__(self, weights_path: str = 'models/vgg19.npy') -> None:
     super().__init__()
     try:
       data_dict: dict = np.load(weights_path, encoding='latin1', allow_pickle=True).item()
@@ -143,7 +271,6 @@ class VGGCaffePreTrained(PretrainNet):
     except FileNotFoundError as e:
       print(ERROR, "weights_path:", weights_path,
             'does not exits!, if you want to training must download pretrained weights')
-    self.output_index = output_index
 
   def _process(self, x):
     # NOTE 图像范围为[-1~1]，先denormalize到0-1再归一化
@@ -160,11 +287,8 @@ class VGGCaffePreTrained(PretrainNet):
   def _forward_impl(self, x):
     x = self._process(x)
     # NOTE get output with out relu activation
-    x = self.features[:self.output_index](x)
+    x = self.features(x)
     return x
-
-  def forward(self, x):
-    return self._forward_impl(x)
 
   @staticmethod
   def get_conv_filter(data_dict, name):
@@ -205,3 +329,7 @@ class VGGCaffePreTrained(PretrainNet):
         in_channels = v
 
     return nn.Sequential(*layers)
+
+  def get_name_list(self):
+    named_children = list(self.features.named_children())
+    return [name + '_' + mod._get_name() for name, mod in named_children]

@@ -3,7 +3,7 @@ import sys
 sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
 from networks.gan import SpectNormDiscriminator, UnetGenerator
-from networks.pretrainnet import VGGCaffePreTrained
+from networks.pretrainnet import VGGCaffePreTrained,featrue_extract_wrapper
 from datamodules.whiteboxgands import WhiteBoxGANDataModule
 from losses.gan_loss import LSGanLoss
 import torch
@@ -134,6 +134,7 @@ class WhiteBoxGAN(pl.LightningModule):
     self.lsgan_loss = LSGanLoss()
     self.colorshift = ColorShift()
     self.pretrained = VGGCaffePreTrained()
+    featrue_extract_wrapper(self.pretrained, 26) # stop the self.pretrained forward progress
     self.l1_loss = nn.L1Loss('mean')
     self.variation_loss = VariationLoss(1)
     self.superpixel_fn = partial(self.SuperPixelDict[superpixel_fn],

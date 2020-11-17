@@ -178,8 +178,8 @@ class MultiBatchSampler(Sampler):
                        "but got batch_size={}".format(batch_size))
 
     assert len(samplers) == len(repeats), 'Samplers number must equal repeats number'
-
-    minweight = min(repeats)
+    # NOTE remove repeat == 0 
+    minweight = min([repeat for repeat in repeats if repeat != 0])
     minlength = len(samplers[repeats.index(minweight)])
     self.sampler_loop = cycle([i for i, w in enumerate(repeats) for _ in range(w)])
     # expand to target length

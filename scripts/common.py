@@ -21,9 +21,9 @@ CALLBACKDICT = {
 
 def log_images(cls: pl.LightningModule,
                images_dict: Dict[str, torch.Tensor],
-               num: int = 4):
+               num: int = 4, normalize=True):
   for k, images in images_dict.items():
-    image_show = torchvision.utils.make_grid(images[:num], nrow=4, normalize=True)  # to [0~1]
+    image_show = torchvision.utils.make_grid(images[:num], nrow=4, normalize=normalize)  # to [0~1]
     cls.logger.experiment.add_image(k, image_show, cls.global_step)
 
 

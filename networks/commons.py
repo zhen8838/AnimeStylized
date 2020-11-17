@@ -26,3 +26,7 @@ class PretrainNet(pl.LightningModule):
 
   def setup(self, device: torch.device):
     self.freeze()
+
+  def forward(self, x):
+    y = self._forward_impl(x)
+    return y

@@ -42,6 +42,9 @@ class UagtitGAN(pl.LightningModule):
     self.MSE_loss = nn.MSELoss()
     self.BCE_loss = nn.BCEWithLogitsLoss()
 
+  def forward(self, x):
+    return self.genA2B(x)
+
   def on_train_start(self) -> None:
     self.facenet.setup(self.device)
 
@@ -197,5 +200,31 @@ class UagtitGAN(pl.LightningModule):
     log_images(self, {'gen/A/fake_A2B': fake_A2B})
 
 
+def infer_fn(model: UagtitGAN, image_path: str):
+  from datamodules.dsfunction import imread, denormalize
+  import datamodules.dstransform as transforms
+  from pathlib import Path
+  import cv2
+  from utils.terminfo import INFO
+
+  infer_transform = transforms.Compose([
+      transforms.ResizeToScale((256, 256), 32),
+      transforms.ToTensor(),
+      transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
+  ])
+  model.eval()
+
+  im = imread(image_path)
+  feed_im = infer_transform(im)
+  out_im, cam_logit, heatmap = model.forward(feed_im[None, ...])
+  out_im = out_im[0]
+
+  draw_im = (denormalize(out_im.permute((1, 2, 0)).detach().numpy()) * 255).astype('uint8')
+  path = Path(image_path)
+  output_path = path.parent / (path.stem + '_out' + path.suffix)
+  cv2.imwrite(output_path.as_posix(), cv2.cvtColor(draw_im, cv2.COLOR_RGB2BGR))
+  print(INFO, 'Convert', path, 'to', output_path)
+
+
 if __name__ == "__main__":
-  run_common(UagtitGAN, UagtitGanDataSet)
+  run_common(UagtitGAN, UagtitGanDataSet, infer_fn)

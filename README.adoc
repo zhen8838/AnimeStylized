@@ -171,6 +171,85 @@ a| image::whitebox_test_out.jpg[whiteboxtestout,pdfwidth=50%,scaledwidth=50%]
 . Pytorch version and official version compare results in https://github.com/zhen8838/AnimeStylized/issues/2#issuecomment-726512435[here]
 ====
 
+=== https://github.com/minivision-ai/photo2cartoon[Unsupervised Generative Attentional Networks with Adaptive Layer-Instance Normalization for Image-to-Image Translation(minivision)]
+
+[cols="^.^5,<.^50,<.^50"]
+|===
+
+a| Setup 
+
+2+a| 
+
+. [yellow]#If you just want to use it, **just skip** the following step#
+
+. download dataset from https://drive.google.com/file/d/10SGv_kbYhVLIC2hLlz2GBkHGAo0nec-3/view[here] and unzip
+
+. download `model_mobilefacenet.pth` from https://drive.google.com/file/d/10SGv_kbYhVLIC2hLlz2GBkHGAo0nec-3/view[here] and put into `./models`
+
+
+|Train 
+
+2+a|
+
+* change **configs/uagtit.yaml** menu:dataset[root] to **your path**
+
+* training generator (use kbd:[Ctrl+c] can stop)
+
+[source,bash]
+----
+make train CODE=scripts/uagtit.py CFG=configs/uagtit.yaml
+----
+
+* check progress 
+
+[source,bash]
+----
+make tensorboard LOGDIR=logs/uagtit
+----
+
+|test 
+
+2+a| 
+
+. you can download my pretrained model from https://drive.google.com/drive/folders/1Bu5yIYBPGBlO4yNzUamhWdWs5o5gT1Rx?usp=sharing[here]. (I have not enough GPU and time, so this model effect not so good)
+
+. this model requires an input image that only contains the human head. Since I don’t have time to migrate the previous tools to PyTorch, need to rely on the previous library to process images.(you need clone https://github.com/zhen8838/playground[this repo])
+
+[source,bash]
+----
+python tools/face_crop_and_mask.py \
+  --data_path test/model_image \
+  --save_path test/model_image_faces \
+  --use_face_crop True \
+  --use_face_algin False \
+  --face_crop_ratio 1.3
+----
+
+. run test command
+
+[source,bash]
+----
+make infer CODE=scripts/uagtit.py \
+CKPT=logs/uagtit/version_13/checkpoints/epoch=15.ckpt \
+EXTRA=image_path:asset/uagtit_test.png
+----
+
+.2+| Result 
+
+a| image::uagtit_test.png[uagtit_test,pdfwidth=50%,scaledwidth=50%]
+
+a| image::uagtit_test_out.png[uagtit_testout,pdfwidth=50%,scaledwidth=50%]
+
+|===
+
+
+[NOTE]
+====
+. The menu:model[light] control the model version, the light version requires GPU memory > 8G,non-light version requires GPU memory > 22G.
+
+. Maybe you need training more epoch to get better results.
+====
+
 == Repository structure
 
 [%autowidth,cols="<.^,<.^"]

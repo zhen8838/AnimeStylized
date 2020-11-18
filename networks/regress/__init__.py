@@ -1,1 +1,1 @@
-from .facelandmarknet import VGGlandmarkNet, Res18landmarkNet, AttentionRes18landmarkNet
+from .facelandmarknet import VGGlandmarkNet, Res18landmarkNet, AttentionRes18landmarkNet, AttentionRes18landmarkNetV2

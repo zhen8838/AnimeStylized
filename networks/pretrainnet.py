@@ -2,6 +2,7 @@ from .commons import PretrainNet
 import torchvision
 from .gan.mobilefacenet import MobileFaceNet
 from .regress import Res18landmarkNet
+from networks import NETWORKS, PRETRAINEDS
 import torch
 from datamodules.dsfunction import denormalize, normalize
 import torch.functional as F
@@ -9,7 +10,7 @@ import numpy as np
 import torch.nn as nn
 import torch.nn.functional as nf
 from utils.terminfo import ERROR
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 import types
 
 
@@ -47,7 +48,7 @@ def named_basic_children(model: nn.Module, prefix='') -> List[Tuple[str, nn.Modu
 
 
 def featrue_extract_wrapper(model: nn.Module,
-                            output_index: int,
+                            output_key: str,
                             extract_tuple: bool = False
                             ) -> List[str]:
   """ extract featrue from any basic layer
@@ -57,49 +58,42 @@ def featrue_extract_wrapper(model: nn.Module,
       3. When extracted featrue num == 1, model will retrun tensor.
   Args:
       model (nn.Module): main model
-      output_index (int): output index int or list[int]
+      output_key (str): output key str or list[str]
       extract_tuple (bool, optional): weather convert tuple to value. Defaults to False.
 
   Raises:
       StopForward: stop froward signial
 
   Returns:
-      List[str]: extracted_name list
+      List[str],Dict[str,torch.Tensor]: extracted_name list, extracted_features
   """
-  names: List[str] = []
-  basics: List[nn.Module] = []
-  named_basic = named_basic_children(model)
-  for name, basic in named_basic:
-    names.append(name)
-    basics.append(basic)
-
-  del named_basic
+  named_modules: Dict[str, nn.Module] = dict(model.named_modules())
 
   # for multi-featrue outputs
-  output_indexs: List[int] = None
-  if isinstance(output_index, int):
-    output_indexs = [output_index]
+  output_keys: List[str] = None
+  if isinstance(output_key, str):
+    output_keys = [output_key]
   else:
-    output_indexs = output_index
+    output_keys = output_key
 
   # add hook
   extracted_features = {}
-  extracted_num = len(output_indexs)
+  extracted_num = len(output_keys)
   extracted_name: List[str] = []
   extracted_count = 0
 
-  for i, idx in enumerate(output_indexs):
+  for key in output_keys:
 
     def hook(module: nn.Module, input: torch.Tensor):
       if not extract_tuple:
         input = input[0]
-      extracted_features[names[idx]] = input
+      extracted_features[key] = input
       if extracted_count == extracted_num:
         raise StopForward
 
-    basics[idx].register_forward_pre_hook(hook)
+    named_modules[key].register_forward_pre_hook(hook)
     extracted_count += 1
-    extracted_name.append(names[idx])
+    extracted_name.append(key)
 
   # overwrite model forwar function
   def forward(self, x):
@@ -112,9 +106,10 @@ def featrue_extract_wrapper(model: nn.Module,
         return extracted_features
     return y
   model.forward = types.MethodType(forward, model)
-  return extracted_name
+  return extracted_name, extracted_features
 
 
+@PRETRAINEDS.register()
 class ResNetPreTrained(PretrainNet):
   def __init__(self):
     super().__init__()
@@ -137,7 +132,7 @@ class ResNetPreTrained(PretrainNet):
     # x = self.fc(x)
     return x
 
-
+@PRETRAINEDS.register()
 class VGGPreTrained(PretrainNet):
   def __init__(self):
     """pytorch vgg pretrained net
@@ -200,7 +195,7 @@ class VGGPreTrained(PretrainNet):
     named_children = list(self.features.named_children())
     return [name + '_' + mod._get_name() for name, mod in named_children]
 
-
+@PRETRAINEDS.register()
 class FacePreTrained(PretrainNet):
   def __init__(self, weights_path):
     super().__init__()
@@ -235,12 +230,19 @@ class FacePreTrained(PretrainNet):
   def forward(self, batch_tensor1, batch_tensor2):
     return self.cosine_distance(batch_tensor1, batch_tensor2)
 
-
-class Res18FaceLandmarkPreTrained(PretrainNet):
-  def __init__(self, weights_path='models/facelandmark_full.pth'):
+@PRETRAINEDS.register()
+class FaceLandmarkPreTrained(PretrainNet):
+  def __init__(self, name='Res18landmarkNet', weights_path='models/facelandmark_full.pth'):
     super().__init__()
-    self.model = Res18landmarkNet(landmark_num=5, pretrained=False)
-    self.model.load_state_dict(torch.load(weights_path))
+    self.model: Res18landmarkNet = NETWORKS.get(name)(landmark_num=5, pretrained=False)
+    self._load_weight(weights_path)
+
+  def _load_weight(self, weights_path):
+    try:
+      self.model.load_state_dict(torch.load(weights_path))
+    except FileNotFoundError as e:
+      print(ERROR, "weights_path:", weights_path,
+            'does not exits!, if you want to training must download pretrained weights')
 
   def _process(self, x):
     # NOTE 图像范围为[-1~1]，先denormalize到0-1再归一化
@@ -261,7 +263,31 @@ class Res18FaceLandmarkPreTrained(PretrainNet):
     # NOTE get output [batch,n_landmark,2]
     return torch.reshape(pred, (-1, 5, 2))
 
+@PRETRAINEDS.register()
+class AttentionFaceLandmarkPreTrained(FaceLandmarkPreTrained):
+  def _forward_impl(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    """ attention network forward
+    NOTE change heatmap to 0-1
 
+    Args:
+        x (torch.Tensor): input
+
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor]: pred, heatmap
+    """
+    x = self._process(x)
+    x, heatmap = self.model(x)
+    pred = torch.sigmoid(x)
+    # NOTE get output [batch,n_landmark,2]
+    pred = torch.reshape(pred, (-1, 5, 2))
+
+    # NOTE process heatmap
+    heatmap: torch.Tensor
+    heatmap = heatmap - heatmap.min()
+    heatmap = (1 - (heatmap / heatmap.max()))
+    return pred, heatmap
+
+@PRETRAINEDS.register()
 class VGGCaffePreTrained(PretrainNet):
   cfg = [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256,
          'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M']

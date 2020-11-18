@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
+from networks import NETWORKS
 
 
+@NETWORKS.register
 class ResnetGenerator(nn.Module):
   def __init__(self, ngf=64, img_size=256, light=False):
     super(ResnetGenerator, self).__init__()
@@ -406,7 +408,7 @@ class LIN(nn.Module):
 
     return out
 
-
+@NETWORKS.register
 class AttentionDiscriminator(nn.Module):
   def __init__(self, input_nc, ndf=64, n_layers=5):
     super().__init__()

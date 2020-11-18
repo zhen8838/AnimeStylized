@@ -53,7 +53,7 @@ class AnimeGAN(pl.LightningModule):
     self.discriminator = self.DiscriminatorDict[discriminator_name]()
     self.lsgan_loss = LSGanLoss()
     self.pretrained = self.PreTrainedDict[pretrained_name]()
-    featrue_extract_wrapper(self.pretrained, 26) # stop the self.pretrained forward progress
+    featrue_extract_wrapper(self.pretrained, 'features.26') # stop the self.pretrained forward progress
     self.l1_loss = nn.L1Loss()
     self.huber_loss = nn.SmoothL1Loss()
 

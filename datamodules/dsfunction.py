@@ -55,7 +55,7 @@ def imread(path: str):
   return cv2.cvtColor(cv2.imread(path, flags=cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
 
 
-def imresize(img: np.ndarray, dsize: tuple, interpolation):
+def imresize(img: np.ndarray, dsize: tuple, interpolation=cv2.INTER_LINEAR):
   return cv2.resize(img, dsize, interpolation=interpolation)
 
 

@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as nf
 from scripts.common import run_common, log_images
-from networks.regress import Res18landmarkNet, AttentionRes18landmarkNet
+from networks.regress import Res18landmarkNet, AttentionRes18landmarkNet, AttentionRes18landmarkNetV2
 from datamodules.facelandmarkds import FaceLandMarkDataModule
 
 
@@ -14,6 +14,7 @@ class FaceLandMark(pl.LightningModule):
   LandmarkNetDict = {
       'Res18landmarkNet': Res18landmarkNet,
       'AttentionRes18landmarkNet': AttentionRes18landmarkNet,
+      'AttentionRes18landmarkNetV2': AttentionRes18landmarkNetV2,
   }
 
   def __init__(self, lr: float = 2e-4, im_size: int = 256, landmarknet_name: str = 'Res18landmarkNet', landmark_num: int = 5):
@@ -23,9 +24,12 @@ class FaceLandMark(pl.LightningModule):
     self.net: AttentionRes18landmarkNet = self.LandmarkNetDict[landmarknet_name](landmark_num)
     self.bce = nn.BCEWithLogitsLoss()
 
+  def choice_forward(self):
+    return self.hparams.landmarknet_name in ['AttentionRes18landmarkNet', 'AttentionRes18landmarkNetV2']
+
   def forward(self, image):
     output = self.net(image)
-    if self.hparams.landmarknet_name == 'AttentionRes18landmarkNet':
+    if self.choice_forward():
       pred = torch.sigmoid(output[0])
       return torch.reshape(pred, (-1, 5, 2)), output[1]
     else:
@@ -36,7 +40,7 @@ class FaceLandMark(pl.LightningModule):
     image = batch['image']
     landmark_gt = batch['keypoints']
     landmark_gt = torch.flatten(landmark_gt, 1, -1)
-    if self.hparams.landmarknet_name == 'AttentionRes18landmarkNet':
+    if self.choice_forward():
       landmark_pred, heatmap = self.net(image)
     else:
       landmark_pred = self.net(image)
@@ -48,7 +52,7 @@ class FaceLandMark(pl.LightningModule):
     image = batch['image']
     landmark_gt = batch['keypoints']
     landmark_gt = torch.flatten(landmark_gt, 1, -1)
-    if self.hparams.landmarknet_name == 'AttentionRes18landmarkNet':
+    if self.choice_forward():
       landmark_pred, heatmap = self.net(image)
     else:
       landmark_pred = self.net(image)
@@ -66,7 +70,7 @@ class FaceLandMark(pl.LightningModule):
 
 
 def infer_fn(model: FaceLandMark, image_path: str):
-  from datamodules.dsfunction import imread
+  from datamodules.dsfunction import imread, imresize
   import albumentations as A
   from albumentations.pytorch import ToTensorV2
   from datamodules.facelandmarkds import vis_keypoints
@@ -83,19 +87,21 @@ def infer_fn(model: FaceLandMark, image_path: str):
   transformed = transform(image=image)
   trans_image = transformed['image']
   trans_image = torch.unsqueeze(trans_image, 0)
-  if model.hparams.landmarknet_name == 'AttentionRes18landmarkNet':
+  if model.choice_forward():
     landmark_pred, heatmap = model.forward(trans_image)
   else:
     landmark_pred = model.forward(trans_image)
   landmark_pred = torch.squeeze(landmark_pred, 0)
   landmark_pred = landmark_pred.detach().numpy() * orig_height
   vis_keypoints(image, landmark_pred, diameter=10)
-  if model.hparams.landmarknet_name == 'AttentionRes18landmarkNet':
-    cm = torch.FloatTensor(jet())
+  plt.show()
+  if model.choice_forward():
+    cm = jet()
     heatmap = heatmap - heatmap.min()
-    heatmap = heatmap / heatmap.max()
+    heatmap = (1 - (heatmap / heatmap.max())) * 255
     heatmap = heatmap.detach().numpy().transpose((0, 2, 3, 1))
-    plt.imshow(heatmap[0])
+    heatmap = imresize(heatmap[0], (orig_height, orig_height)).astype('uint8')
+    plt.imshow(cm[heatmap])
   plt.show()
 
 

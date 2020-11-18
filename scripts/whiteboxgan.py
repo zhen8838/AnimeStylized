@@ -134,7 +134,7 @@ class WhiteBoxGAN(pl.LightningModule):
     self.lsgan_loss = LSGanLoss()
     self.colorshift = ColorShift()
     self.pretrained = VGGCaffePreTrained()
-    featrue_extract_wrapper(self.pretrained, 26) # stop the self.pretrained forward progress
+    featrue_extract_wrapper(self.pretrained, 'features.26') # stop the self.pretrained forward progress
     self.l1_loss = nn.L1Loss('mean')
     self.variation_loss = VariationLoss(1)
     self.superpixel_fn = partial(self.SuperPixelDict[superpixel_fn],

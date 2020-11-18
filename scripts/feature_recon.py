@@ -2,8 +2,8 @@ import os
 import sys
 sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
-from networks.gan import AnimeGeneratorLite, UnetGenerator
-from networks.pretrainnet import VGGPreTrained, VGGCaffePreTrained, Res18FaceLandmarkPreTrained, featrue_extract_wrapper
+from networks import PRETRAINEDS, NETWORKS, build_network
+from networks.pretrainnet import featrue_extract_wrapper
 from datamodules.feature_reconds import FeatrueReconDataModule
 import torch
 import torch.nn as nn
@@ -12,39 +12,34 @@ from typing import List, Tuple
 
 
 class FeatureRecon(pl.LightningModule):
-  PreTrainedDict = {
-      'VGGPreTrained': VGGPreTrained,
-      'VGGCaffePreTrained': VGGCaffePreTrained,
-      'Res18FaceLandmarkPreTrained': Res18FaceLandmarkPreTrained
-  }
-  GeneratorDict = {
-      'AnimeGeneratorLite': AnimeGeneratorLite,
-      'UnetGenerator': UnetGenerator
-  }
 
-  def __init__(self, lr_g: float, layer_indexs: List[int] = [26],
-               pretrained_fn: str = 'VGGPreTrained',
-               generator_fn: str = 'AnimeGeneratorLite'):
+  def __init__(self, lr_g: float, layer_keys: List[int],
+               pretrained_name: str = 'VGGPreTrained',
+               pretrained_kwargs: dict = {},
+               generator_name: str = 'AnimeGeneratorLite',
+               generator_kwargs: dict = {}
+               ):
     super().__init__()
     self.save_hyperparameters()
 
-    # self.catoon_generators = nn.ModuleList([AnimeGeneratorLite() for i in layer_indexs])
-    generator_fn = self.GeneratorDict[generator_fn]
-    self.real_generators = nn.ModuleList([generator_fn() for i in layer_indexs])
-    pretrained_fn = self.PreTrainedDict[pretrained_fn]
+    # self.catoon_generators = nn.ModuleList([AnimeGeneratorLite() for i in layer_keys])
+    self.real_generators = nn.ModuleList(
+        [build_network(NETWORKS, generator_name, generator_kwargs) for i in layer_keys])
+
     self.pretraineds = []
     self.name_list: List[str] = []
-    for output_index in layer_indexs:
-      pretrained = pretrained_fn()
+    for output_index in layer_keys:
+      pretrained = build_network(PRETRAINEDS, pretrained_name, pretrained_kwargs)
       # NOTE this script only for one featrue experiment
-      self.name_list.append(featrue_extract_wrapper(pretrained, output_index)[0])
+      name, _ = featrue_extract_wrapper(pretrained, output_index)
+      self.name_list.append(name[0])
       self.pretraineds.append(pretrained)
     self.pretraineds = nn.ModuleList(self.pretraineds)
     self.l1_loss = nn.L1Loss()
 
   def on_fit_start(self):
-    for vgg in self.pretraineds:
-      vgg.setup(self.device)
+    for pretrained in self.pretraineds:
+      pretrained.setup(self.device)
 
   def training_step(self, batch: Tuple[torch.Tensor], batch_idx, optimizer_idx):
     input_photo, input_cartoon = batch
@@ -72,10 +67,10 @@ class FeatureRecon(pl.LightningModule):
     #     concat((self.catoon_generators[i].parameters(),
     #             self.real_generators[i].parameters())),
     #     lr=self.hparams.lr_g,
-    #     betas=(0.5, 0.999)) for i, _ in enumerate(self.hparams.layer_indexs)]
+    #     betas=(0.5, 0.999)) for i, _ in enumerate(self.hparams.layer_keys)]
     opt_g = [torch.optim.Adam(self.real_generators[i].parameters(),
                               lr=self.hparams.lr_g,
-                              betas=(0.5, 0.999)) for i, _ in enumerate(self.hparams.layer_indexs)]
+                              betas=(0.5, 0.999)) for i, _ in enumerate(self.hparams.layer_keys)]
     return opt_g
 
   def validation_step(self, batch, batch_idx):
@@ -83,7 +78,7 @@ class FeatureRecon(pl.LightningModule):
     d = {}
     d['input/real'] = input_photo
     d['input/cartoon'] = input_cartoon
-    for i, idx in enumerate(self.hparams.layer_indexs):
+    for i, idx in enumerate(self.hparams.layer_keys):
       d[f'gen/{self.name_list[i]}_real'] = self.real_generators[i](input_photo)
       d[f'gen/{self.name_list[i]}_cartoon'] = self.real_generators[i](input_cartoon)
     log_images(self, d)

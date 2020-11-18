@@ -2,8 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils import spectral_norm
+from networks import NETWORKS
 
 
+@NETWORKS.register()
 class AnimeDiscriminator(nn.Module):
   def __init__(self, channel: int = 64, nblocks: int = 3) -> None:
     super().__init__()
@@ -114,8 +116,7 @@ class InvertedresBlock(nn.Module):
       out = x
     return x
 
-
-
+@NETWORKS.register()
 class AnimeGeneratorLite(nn.Module):
   def __init__(self) -> None:
     super().__init__()
@@ -160,7 +161,7 @@ class AnimeGeneratorLite(nn.Module):
     x = self.out(x)
     return x
 
-
+@NETWORKS.register()
 class AnimeGenerator(nn.Module):
   def __init__(self) -> None:
     super().__init__()

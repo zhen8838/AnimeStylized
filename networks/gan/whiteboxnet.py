@@ -1,7 +1,7 @@
 import torch.nn as nn
 from torch.nn.utils import spectral_norm
 from networks.commons import Mean
-
+from networks import NETWORKS
 
 def calc(pad, h, k, s):
   import math
@@ -19,7 +19,7 @@ class ResBlock(nn.Module):
     x = self.conv1(self.leaky_relu(self.conv1(inputs)))
     return x + inputs
 
-
+@NETWORKS.register()
 class UnetGenerator(nn.Module):
   def __init__(self, channel=32, num_blocks=4):
     super().__init__()
@@ -73,7 +73,7 @@ class UnetGenerator(nn.Module):
 
     return self.act(x4)
 
-
+@NETWORKS.register()
 class SpectNormDiscriminator(nn.Module):
   def __init__(self, channel=32, patch=True):
     super().__init__()

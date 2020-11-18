@@ -159,7 +159,7 @@ class WhiteBoxGAN(pl.LightningModule):
 
   def forward(self, input_photo) -> torch.Tensor:
     generator_img = self.generator(input_photo)
-    output = self.guided_filter(input_photo, generator_img, r=1)
+    output = self.guided_filter(input_photo, generator_img, r=1, eps=5e-3)
     return output
 
   def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx, optimizer_idx):

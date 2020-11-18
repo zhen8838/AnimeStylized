@@ -205,7 +205,11 @@ class FacePreTrained(PretrainNet):
   def __init__(self, weights_path):
     super().__init__()
     self.model = MobileFaceNet(512)
-    self.model.load_state_dict(torch.load(weights_path))
+    try:
+      self.model.load_state_dict(torch.load(weights_path))
+    except FileNotFoundError as e:
+      print(ERROR, "weights_path:", weights_path,
+            'does not exits!, if you want to training must download pretrained weights')
 
   def infer(self, batch_tensor):
     # crop face

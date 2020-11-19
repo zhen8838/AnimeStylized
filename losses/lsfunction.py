@@ -51,7 +51,7 @@ def rgb2yuv(rgb: torch.Tensor) -> torch.Tensor:
       rgb (torch.Tensor): 4D tensor , [b,c,h,w]
 
   Returns:
-      torch.Tensor: 4D tensor, [b,h,w,c]
+      torch.Tensor: 4D tensor, [b,h,w,c] in [0~1]
   """
   kernel = torch.tensor([[0.299, -0.14714119, 0.61497538],
                          [0.587, -0.28886916, -0.51496512],

@@ -140,6 +140,7 @@ class AttentionRes18landmarkNetV2(nn.Module):
     self.conv1x1 = nn.Conv2d(128 * 2, 128, kernel_size=1, stride=1, bias=True)
     self.relu = nn.ReLU(True)
     self.fc = nn.Linear(512, landmark_num * 2)
+    self.flatten = nn.Flatten()
 
   def _forward_impl(self, x):
     x = self.res.conv1(x)
@@ -165,7 +166,7 @@ class AttentionRes18landmarkNetV2(nn.Module):
     x = self.res.layer3(x)
     x = self.res.layer4(x)
 
-    x = torch.flatten(self.avgpool(x), 1)
+    x = self.flatten(self.avgpool(x))
     logit = gap_logit + gmp_logit + self.fc(x)
     return logit, heatmap
 

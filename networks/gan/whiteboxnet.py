@@ -75,6 +75,28 @@ class UnetGenerator(nn.Module):
 
 @NETWORKS.register()
 class SpectNormDiscriminator(nn.Module):
+  """SpectNormDiscriminator
+  ----------------------------------------------------------------
+          Layer (type)               Output Shape         Param #
+  ================================================================
+              Conv2d-1         [-1, 32, 128, 128]             896
+          LeakyReLU-2         [-1, 32, 128, 128]               0
+              Conv2d-3         [-1, 32, 128, 128]           9,248
+          LeakyReLU-4         [-1, 32, 128, 128]               0
+              Conv2d-5           [-1, 64, 64, 64]          18,496
+          LeakyReLU-6           [-1, 64, 64, 64]               0
+              Conv2d-7           [-1, 64, 64, 64]          36,928
+          LeakyReLU-8           [-1, 64, 64, 64]               0
+              Conv2d-9          [-1, 128, 32, 32]          73,856
+          LeakyReLU-10          [-1, 128, 32, 32]               0
+            Conv2d-11          [-1, 128, 32, 32]         147,584
+          LeakyReLU-12          [-1, 128, 32, 32]               0
+            Conv2d-13            [-1, 1, 32, 32]             129
+  ================================================================
+  Total params: 287,137
+  Trainable params: 287,137
+  Non-trainable params: 0
+  """  
   def __init__(self, channel=32, patch=True):
     super().__init__()
     self.channel = channel

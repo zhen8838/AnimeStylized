@@ -49,7 +49,8 @@ def named_basic_children(model: nn.Module, prefix='') -> List[Tuple[str, nn.Modu
 
 def featrue_extract_wrapper(model: nn.Module,
                             output_key: str,
-                            extract_tuple: bool = False
+                            extract_tuple: bool = False,
+                            auto_stop: bool = True,
                             ) -> List[str]:
   """ extract featrue from any basic layer
     NOTE:
@@ -60,6 +61,7 @@ def featrue_extract_wrapper(model: nn.Module,
       model (nn.Module): main model
       output_key (str): output key str or list[str]
       extract_tuple (bool, optional): weather convert tuple to value. Defaults to False.
+      auto_stop (bool): if auto_stop, it will stop the model forward
 
   Raises:
       StopForward: stop froward signial
@@ -82,15 +84,18 @@ def featrue_extract_wrapper(model: nn.Module,
   extracted_name: List[str] = []
   extracted_count = 0
 
-  for key in output_keys:
-
+  def hook_creator(count: int, key: str):
     def hook(module: nn.Module, input: torch.Tensor):
       if not extract_tuple:
         input = input[0]
       extracted_features[key] = input
-      if extracted_count == extracted_num:
-        raise StopForward
+      if auto_stop:
+        if count == extracted_num:
+          raise StopForward
+    return hook
 
+  for key in output_keys:
+    hook = hook_creator(extracted_count, key)
     named_modules[key].register_forward_pre_hook(hook)
     extracted_count += 1
     extracted_name.append(key)
@@ -105,7 +110,8 @@ def featrue_extract_wrapper(model: nn.Module,
       else:
         return extracted_features
     return y
-  model.forward = types.MethodType(forward, model)
+  if auto_stop:
+    model.forward = types.MethodType(forward, model)
   return extracted_name, extracted_features
 
 
@@ -131,6 +137,7 @@ class ResNetPreTrained(PretrainNet):
     # x = torch.flatten(x, 1)
     # x = self.fc(x)
     return x
+
 
 @PRETRAINEDS.register()
 class VGGPreTrained(PretrainNet):
@@ -195,6 +202,7 @@ class VGGPreTrained(PretrainNet):
     named_children = list(self.features.named_children())
     return [name + '_' + mod._get_name() for name, mod in named_children]
 
+
 @PRETRAINEDS.register()
 class FacePreTrained(PretrainNet):
   def __init__(self, weights_path):
@@ -230,6 +238,7 @@ class FacePreTrained(PretrainNet):
   def forward(self, batch_tensor1, batch_tensor2):
     return self.cosine_distance(batch_tensor1, batch_tensor2)
 
+
 @PRETRAINEDS.register()
 class FaceLandmarkPreTrained(PretrainNet):
   def __init__(self, name='Res18landmarkNet', weights_path='models/facelandmark_full.pth'):
@@ -263,6 +272,7 @@ class FaceLandmarkPreTrained(PretrainNet):
     # NOTE get output [batch,n_landmark,2]
     return torch.reshape(pred, (-1, 5, 2))
 
+
 @PRETRAINEDS.register()
 class AttentionFaceLandmarkPreTrained(FaceLandmarkPreTrained):
   def _forward_impl(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -286,6 +296,7 @@ class AttentionFaceLandmarkPreTrained(FaceLandmarkPreTrained):
     heatmap = heatmap - heatmap.min()
     heatmap = (1 - (heatmap / heatmap.max()))
     return pred, heatmap
+
 
 @PRETRAINEDS.register()
 class VGGCaffePreTrained(PretrainNet):

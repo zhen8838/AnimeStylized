@@ -14,21 +14,20 @@ class WhiteBoxGANDataModule(pl.LightningDataModule):
                face_style: str = 'pa_face',
                sample_steps: list = [4, 1],
                batch_size: int = 8, num_workers: int = 4,
-               normalize=True, totenor=True):
+               resize=False, normalize=True, totenor=True):
     super().__init__()
     self.root = Path(root)
     self.scene_style = scene_style
     self.face_style = face_style
     self.batch_size = batch_size
     self.num_workers = num_workers
-    self.normalize = normalize
-    self.totenor = totenor
     self.sample_steps = sample_steps
     self.dims = (3, 256, 256)
 
     idenity = transforms.Lambda(lambda x: x)
 
     self.transform = transforms.Compose([
+        transforms.Resize((256, 256)) if resize else idenity,
         transforms.ToTensor() if totenor else idenity,
         transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5)) if normalize else idenity])
 

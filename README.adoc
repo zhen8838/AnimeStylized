@@ -16,7 +16,7 @@
 conda create -n torch python=3.8
 conda activate torch
 conda install pytorch==1.6.0 torchvision==0.7.0 cudatoolkit=10.1 -c pytorch
-pip install pytorch-lightning==1.0.2 opencv-python matplotlib joblib scikit-image torchsummary webdataset albumentations
+pip install pytorch-lightning==1.0.2 opencv-python matplotlib joblib scikit-image torchsummary webdataset albumentations more_itertools
 ----
 
 == Algorithm
@@ -72,14 +72,20 @@ a|
 
 . you can download my pretrained model from https://drive.google.com/drive/folders/1Bu5yIYBPGBlO4yNzUamhWdWs5o5gT1Rx?usp=sharing[here].
 
-. run test command(process video coming soon)
+. run test command
 
 [source,bash]
 ----
 make infer CODE=scripts/animeganv2.py \
 CKPT=logs/animeganv2/version_0/checkpoints/epoch=17.ckpt \
-EXTRA=image_path:asset/animegan_test2.jpg
+EXTRA=image_path:asset/animegan_test2.jpg # <1>
+
+make infer CODE=scripts/animeganv2.py \
+CKPT=logs/animeganv2/version_0/checkpoints/epoch=17.ckpt \
+EXTRA=help # <2>
 ----
+<1> The `EXTRA` paramter can pass `image path` or `image directory path`
+<2> Read help.
 
 .2+| Result 
 
@@ -146,15 +152,26 @@ make tensorboard LOGDIR=logs/whitebox
 
 . you can download my pretrained model from https://drive.google.com/drive/folders/1Bu5yIYBPGBlO4yNzUamhWdWs5o5gT1Rx?usp=sharing[here]. you can use choice `whitebox-v2.zip` or `whitebox.zip`
 
-. run test command(process video coming soon)
+. run test command
 
 [source,bash]
 ----
 make infer CODE=scripts/whiteboxgan.py \
 CKPT=logs/whitebox/version_0/checkpoints/epoch=4.ckpt \
 EXTRA=image_path:asset/whitebox_test.jpg # <1>
+
+make infer CODE=scripts/whiteboxgan.py \
+CKPT=logs/whitebox/version_0/checkpoints/epoch=4.ckpt \
+EXTRA=image_path:tests/test.flv,device:cuda,batch_size:4 # <2>
+# ffmpeg -i xx.mp4 -vcodec libx265 -crf 28 xxx.mp4
+
+make infer CODE=scripts/whiteboxgan.py \
+CKPT=logs/whitebox/version_0/checkpoints/epoch=4.ckpt \
+EXTRA=help # <3>
 ----
 <1> The `EXTRA` paramter can pass `image path` or `image directory path`
+<2> Using GPU convert video, if GPU ran out of memory, pleas use `cpu`
+<3> Read help.
 
 .2+| Result 
 

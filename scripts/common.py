@@ -10,6 +10,7 @@ from pytorch_lightning.utilities import rank_zero_only, rank_zero_warn, rank_zer
 from typing import Dict
 import torchvision
 import argparse
+from utils.terminfo import INFO
 
 CALLBACKDICT = {
     'EarlyStopping': EarlyStopping,
@@ -118,7 +119,7 @@ def run_common(model_class: pl.LightningModule,
     with open(args.config, 'r') as f:
       config: dict = safe_load(f)
     if args.ckpt:
-      print("Load from checkpoint", args.ckpt)
+      print(INFO, "Load from checkpoint", args.ckpt)
       model = model_class.load_from_checkpoint(args.ckpt, strict=False, **config['model'])
     else:
       model = model_class(**config['model'])
@@ -140,12 +141,12 @@ def run_common(model_class: pl.LightningModule,
     elif args.stage == 'test':
       trainer.test(model, datamodule)
   elif args.stage == 'infer':
-    print("Load from checkpoint", args.ckpt)
+    print(INFO, "Load from checkpoint", args.ckpt)
     model = model_class.load_from_checkpoint(args.ckpt, strict=False)
     kwargs = parser_extra_args(args.extra)
     infer_fn(model, **kwargs)
   elif args.stage == 'export':
-    print("Load from checkpoint", args.ckpt)
+    print(INFO, "Load from checkpoint", args.ckpt)
     model = model_class.load_from_checkpoint(args.ckpt, strict=False)
     kwargs = parser_extra_args(args.extra)
     export_fn(model, **kwargs)

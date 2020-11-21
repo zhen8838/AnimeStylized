@@ -179,7 +179,7 @@ a| image::whitebox_test.jpg[whiteboxtest,pdfwidth=50%,scaledwidth=50%]
 
 a| image::whitebox_test_out.jpg[whiteboxtestout,pdfwidth=50%,scaledwidth=50%]
 
-2+a| image::whitebox_video.png[whitebox_video,pdfwidth=50%,scaledwidth=50%]
+2+^.^a| image::whitebox_video.png[whitebox_video,pdfwidth=50%,scaledwidth=50%,link="https://www.bilibili.com/video/BV14V411a73o/"]
 
 |===
 

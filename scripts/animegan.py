@@ -11,6 +11,7 @@ from losses.lsfunction import variation_loss, rgb2yuv
 import torch
 import torch.nn as nn
 from scripts.common import run_common, log_images
+from scripts.whiteboxgan import infer_fn
 
 
 class AnimeGAN(pl.LightningModule):
@@ -161,31 +162,6 @@ class AnimeGAN(pl.LightningModule):
     input_photo = batch
     log_images(self, {'input/real': input_photo,
                       'generate/anime': self.generator(input_photo)})
-
-
-def infer_fn(model: AnimeGAN, image_path: str):
-  from datamodules.dsfunction import imread, denormalize
-  import datamodules.dstransform as transforms
-  from pathlib import Path
-  import cv2
-  from utils.terminfo import INFO
-
-  infer_transform = transforms.Compose([
-      transforms.ResizeToScale((256, 256), 32),
-      transforms.ToTensor(),
-      transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.5, 0.5, 0.5))
-  ])
-  model.setup('test')
-  model.eval()
-
-  im = imread(image_path)
-  feed_im = infer_transform(im)
-  out_im = model.forward(feed_im[None, ...])[0]
-  draw_im = (denormalize(out_im.permute((1, 2, 0)).detach().numpy()) * 255).astype('uint8')
-  path = Path(image_path)
-  output_path = path.parent / (path.stem + '_out' + path.suffix)
-  cv2.imwrite(output_path.as_posix(), cv2.cvtColor(draw_im, cv2.COLOR_RGB2BGR))
-  print(INFO, 'Convert', path, 'to', output_path)
 
 
 if __name__ == "__main__":

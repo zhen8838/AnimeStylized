@@ -99,12 +99,16 @@ def parser_args():
   return parser.parse_args()
 
 
-def parser_extra_args(args: str) -> dict:
-  kwargs = {}
+def parser_extra_args(args: str) -> list:
+  args_list = []
   for line in args.split(','):
-    k, v = line.split(':')
-    kwargs.setdefault(k, v)
-  return kwargs
+    if ':' in line:
+      k, v = line.split(':')
+      args_list.append('--' + k)
+      args_list.append(v)
+    else:
+      args_list.append('--' + line)
+  return args_list
 
 
 def run_common(model_class: pl.LightningModule,
@@ -143,13 +147,13 @@ def run_common(model_class: pl.LightningModule,
   elif args.stage == 'infer':
     print(INFO, "Load from checkpoint", args.ckpt)
     model = model_class.load_from_checkpoint(args.ckpt, strict=False)
-    kwargs = parser_extra_args(args.extra)
-    infer_fn(model, **kwargs)
+    args_list = parser_extra_args(args.extra)
+    infer_fn(model, args_list)
   elif args.stage == 'export':
     print(INFO, "Load from checkpoint", args.ckpt)
     model = model_class.load_from_checkpoint(args.ckpt, strict=False)
-    kwargs = parser_extra_args(args.extra)
-    export_fn(model, **kwargs)
+    args_list = parser_extra_args(args.extra)
+    export_fn(model, args_list)
 
 
 if __name__ == "__main__":

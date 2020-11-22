@@ -23,12 +23,12 @@ pip install pytorch-lightning==1.0.2 opencv-python matplotlib joblib scikit-imag
 
 === https://github.com/TachibanaYoshino/AnimeGANv2[AnimeGAN: A Novel Lightweight GAN for Photo Animation]
 
-[cols="^.^5,<.^95"]
+[cols="^.^5,<.^50,<.^50"]
 |===
 
 a| Setup 
 
-a| 
+2+a| 
 
 . [yellow]#If you just want to use it, **just skip** the following step#
 
@@ -39,7 +39,7 @@ a|
 
 |Train 
 
-a|
+2+a|
 
 * change **configs/animegan_pretrain.yaml** menu:dataset[root] to **your path**
 
@@ -68,7 +68,7 @@ make tensorboard LOGDIR=logs/animeganv2/
 
 |test 
 
-a| 
+2+a| 
 
 . you can download my pretrained model from https://drive.google.com/drive/folders/1Bu5yIYBPGBlO4yNzUamhWdWs5o5gT1Rx?usp=sharing[here].
 
@@ -89,9 +89,11 @@ EXTRA=help # <2>
 
 .2+| Result 
 
-a| image::animegan_test2.jpg[animegantest,624,432,pdfwidth=50%,scaledwidth=50%]
+a| image::animegan_test2.jpg[animegantest,pdfwidth=50%,scaledwidth=50%]
 
-a| image::animegan_test2_out.jpg[animegantestout,624,432,pdfwidth=50%,scaledwidth=50%]
+a| image::animegan_test2_out.jpg[animegantestout,pdfwidth=50%,scaledwidth=50%]
+
+2+^.^a| image::anime_video.png[animevideo,624,432,pdfwidth=50%,scaledwidth=50%,link="https://www.bilibili.com/video/BV1gy4y1z7o2"]
 
 |===
 

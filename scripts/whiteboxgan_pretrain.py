@@ -27,13 +27,13 @@ class WhiteBoxGANPretrain(WhiteBoxGAN):
     return opt_g
 
   def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor], batch_idx):
-    input_photo = batch
+    input_photo = torch.cat(batch)
     generator_img = self.generator(input_photo)
 
     log_images(self, {
         'input/real': input_photo,
         'generate/anime': generator_img,
-    })
+    }, 8)
 
 
 if __name__ == "__main__":

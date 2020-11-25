@@ -323,7 +323,7 @@ class VGGCaffePreTrained(PretrainNet):
     mean: torch.Tensor = torch.tensor([103.939, 116.779, 123.68], device=device)
     mean = mean[None, :, None, None]
     self.vgg_normalize = lambda x: x - mean
-    self.freeze()
+    # self.freeze()
 
   def _forward_impl(self, x):
     x = self._process(x)

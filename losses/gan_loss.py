@@ -26,9 +26,9 @@ class LSGanLoss(nn.Module):
     # 1/2 * [(real-b)^2 + (fake-a)^2]
     return 0.5 * (torch.mean((real_logit - 1)**2) + torch.mean(fake_logit**2))
 
-  def _g_loss(self, fake_logit):
+  def _g_loss(self, fake_logit, weight=1.):
     # 1/2 * (fake-c)^2
-    return torch.mean((fake_logit - 1)**2)
+    return torch.mean((fake_logit - 1)**2 * weight)
 
   def forward(self, real_logit, fake_logit):
     g_loss = self._g_loss(fake_logit)

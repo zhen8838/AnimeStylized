@@ -5,7 +5,7 @@ from torch.nn.parameter import Parameter
 from networks import NETWORKS
 
 
-@NETWORKS.register
+@NETWORKS.register()
 class ResnetGenerator(nn.Module):
   def __init__(self, ngf=64, img_size=256, light=False):
     super(ResnetGenerator, self).__init__()
@@ -226,6 +226,7 @@ class HourGlassBlock(nn.Module):
     self.ConvBlock7 = ConvBlock(dim_out, dim_out)
     self.ConvBlock8 = ConvBlock(dim_out, dim_out)
     self.ConvBlock9 = ConvBlock(dim_out, dim_out)
+    self.upsample = nn.UpsamplingBilinear2d(scale_factor=2)
 
   def forward(self, x):
     skip1 = self.ConvBlock1_1(x)
@@ -247,19 +248,19 @@ class HourGlassBlock(nn.Module):
     center = self.ConvBlock5(down4)
 
     up4 = self.ConvBlock6(center)
-    up4 = F.upsample(up4, scale_factor=2)
+    up4 = self.upsample(up4)
     up4 = skip4 + up4
 
     up3 = self.ConvBlock7(up4)
-    up3 = F.upsample(up3, scale_factor=2)
+    up3 = self.upsample(up3)
     up3 = skip3 + up3
 
     up2 = self.ConvBlock8(up3)
-    up2 = F.upsample(up2, scale_factor=2)
+    up2 = self.upsample(up2)
     up2 = skip2 + up2
 
     up1 = self.ConvBlock9(up2)
-    up1 = F.upsample(up1, scale_factor=2)
+    up1 = self.upsample(up1)
     up1 = skip1 + up1
 
     return up1
@@ -408,7 +409,8 @@ class LIN(nn.Module):
 
     return out
 
-@NETWORKS.register
+
+@NETWORKS.register()
 class AttentionDiscriminator(nn.Module):
   def __init__(self, input_nc, ndf=64, n_layers=5):
     super().__init__()

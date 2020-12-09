@@ -3,7 +3,7 @@ CODE = None
 LOGDIR = ./logs
 CKPT = None
 EXTRA = None
-
+IMGNUM = 0
 all:
 	@echo please use \"make train\" or other ...
 
@@ -20,4 +20,4 @@ export:
 	python ${CODE} --config None --stage export --ckpt ${CKPT} --extra ${EXTRA}
 
 tensorboard:
-	tensorboard --logdir ${LOGDIR} --samples_per_plugin images=0
+	tensorboard --logdir ${LOGDIR} --samples_per_plugin images=${IMGNUM}

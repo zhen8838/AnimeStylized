@@ -1,21 +1,22 @@
 import os
 import sys
 sys.path.insert(0, os.getcwd())
-import pytorch_lightning as pl
-from networks.gan import SpectNormDiscriminator, UnetGenerator
-from networks.pretrainnet import VGGCaffePreTrained,featrue_extract_wrapper
-from datamodules.whiteboxgands import WhiteBoxGANDataModule
-from losses.gan_loss import LSGanLoss
 import torch
 import torch.nn as nn
 import torch.nn.functional as nf
 import numpy as np
+import pytorch_lightning as pl
 from joblib import Parallel, delayed
 import itertools
+from networks.gan import SpectNormDiscriminator, UnetGenerator
+from networks.pretrainnet import VGGCaffePreTrained
+from datamodules.whiteboxgands import WhiteBoxGANDataModule
+from losses.gan_loss import LSGanLoss
 from torch.distributions import Distribution
 from scripts.common import run_common, log_images
 from typing import List, Tuple
 from utils.superpix import slic, adaptive_slic, sscolor
+from utils.extractor import Extractor
 from functools import partial
 
 
@@ -134,7 +135,8 @@ class WhiteBoxGAN(pl.LightningModule):
     self.lsgan_loss = LSGanLoss()
     self.colorshift = ColorShift()
     self.pretrained = VGGCaffePreTrained()
-    featrue_extract_wrapper(self.pretrained, 'features.26') # stop the self.pretrained forward progress
+    # stop the self.pretrained forward progress
+    Extractor('features.25')(self.pretrained)
     self.l1_loss = nn.L1Loss('mean')
     self.variation_loss = VariationLoss(1)
     self.superpixel_fn = partial(self.SuperPixelDict[superpixel_fn],

@@ -3,7 +3,8 @@ import sys
 sys.path.insert(0, os.getcwd())
 import pytorch_lightning as pl
 from networks.gan import AnimeGeneratorLite, AnimeDiscriminator, UnetGenerator, SpectNormDiscriminator, AnimeGenerator
-from networks.pretrainnet import VGGPreTrained, VGGCaffePreTrained, featrue_extract_wrapper
+from networks.pretrainnet import VGGPreTrained, VGGCaffePreTrained
+from utils.extractor import Extractor
 from datamodules.animegands import AnimeGANDataModule
 from datamodules.dsfunction import denormalize
 from losses.gan_loss import LSGanLoss
@@ -54,7 +55,8 @@ class AnimeGAN(pl.LightningModule):
     self.discriminator = self.DiscriminatorDict[discriminator_name]()
     self.lsgan_loss = LSGanLoss()
     self.pretrained = self.PreTrainedDict[pretrained_name]()
-    featrue_extract_wrapper(self.pretrained, 'features.26') # stop the self.pretrained forward progress
+    # stop the self.pretrained forward progress
+    Extractor('features.25')(self.pretrained)
     self.l1_loss = nn.L1Loss()
     self.huber_loss = nn.SmoothL1Loss()
 

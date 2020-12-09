@@ -14,107 +14,6 @@ from typing import List, Tuple, Dict, Optional
 import types
 
 
-class StopForward(Exception):
-  """The pretrain model forward stop signal
-  """
-  pass
-
-
-def named_basic_children(model: nn.Module, prefix='') -> List[Tuple[str, nn.Module]]:
-  """Extract model basic module class object
-
-  Args:
-      model (nn.Module): model
-      prefix (str, optional): Defaults to ''.
-
-  Returns:
-      List[Tuple[str, nn.Module]]: [(name,basic_module_object)]
-  """
-  named_basic = []
-
-  def inner_children(model, prefix=''):
-    named_children = list(model.named_children())
-    if len(named_children) == 0:
-      named_basic.append((prefix, model))
-    for name, children in named_children:
-      inner_children(children, prefix + ('.' if prefix else '') + name)
-
-  inner_children(model, prefix)
-  # rename list for beautiful print
-  for i, (name, mod) in enumerate(named_basic):
-    s = str(mod.__class__).split('.')[-1].split('\'')[0]
-    named_basic[i] = (f'{s}-{i}', mod)
-  return named_basic
-
-
-def featrue_extract_wrapper(model: nn.Module,
-                            output_key: str,
-                            extract_tuple: bool = False,
-                            auto_stop: bool = True,
-                            ) -> List[str]:
-  """ extract featrue from any basic layer
-    NOTE:
-      1. This function will modify model forward inplace!
-      2. The model must use `_forward_impl` method
-      3. When extracted featrue num == 1, model will retrun tensor.
-  Args:
-      model (nn.Module): main model
-      output_key (str): output key str or list[str]
-      extract_tuple (bool, optional): weather convert tuple to value. Defaults to False.
-      auto_stop (bool): if auto_stop, it will stop the model forward
-
-  Raises:
-      StopForward: stop froward signial
-
-  Returns:
-      List[str],Dict[str,torch.Tensor]: extracted_name list, extracted_features
-  """
-  named_modules: Dict[str, nn.Module] = dict(model.named_modules())
-
-  # for multi-featrue outputs
-  output_keys: List[str] = None
-  if isinstance(output_key, str):
-    output_keys = [output_key]
-  else:
-    output_keys = output_key
-
-  # add hook
-  extracted_features = {}
-  extracted_num = len(output_keys)
-  extracted_name: List[str] = []
-  extracted_count = 0
-
-  def hook_creator(count: int, key: str):
-    def hook(module: nn.Module, input: torch.Tensor):
-      if not extract_tuple:
-        input = input[0]
-      extracted_features[key] = input
-      if auto_stop:
-        if count == extracted_num:
-          raise StopForward
-    return hook
-
-  for key in output_keys:
-    hook = hook_creator(extracted_count, key)
-    named_modules[key].register_forward_pre_hook(hook)
-    extracted_count += 1
-    extracted_name.append(key)
-
-  # overwrite model forwar function
-  def forward(self, x):
-    try:
-      y = self._forward_impl(x)
-    except StopForward as e:
-      if extracted_num == 1:
-        return extracted_features[extracted_name[0]]
-      else:
-        return extracted_features
-    return y
-  if auto_stop:
-    model.forward = types.MethodType(forward, model)
-  return extracted_name, extracted_features
-
-
 @PRETRAINEDS.register()
 class ResNetPreTrained(PretrainNet):
   def __init__(self):
@@ -175,17 +74,19 @@ class VGGPreTrained(PretrainNet):
     vgg = torchvision.models.vgg19(pretrained=True)
     self.features = vgg.features
     del vgg
+    mean = torch.tensor([0.485, 0.456, 0.406])
+    std = torch.tensor([0.229, 0.224, 0.225])
+    mean = mean[None, :, None, None]
+    std = std[None, :, None, None]
+    self.register_buffer('mean', mean)
+    self.register_buffer('std', std)
+    self.vgg_normalize = lambda x: normalize(x, self.mean, self.std)
 
   def _process(self, x):
     # NOTE 图像范围为[-1~1]，先denormalize到0-1再归一化
     return self.vgg_normalize(denormalize(x))
 
   def setup(self, device: torch.device):
-    mean: torch.Tensor = torch.tensor([0.485, 0.456, 0.406], device=device)
-    std = torch.tensor([0.229, 0.224, 0.225], device=device)
-    mean = mean[None, :, None, None]
-    std = std[None, :, None, None]
-    self.vgg_normalize = lambda x: normalize(x, mean, std)
     self.freeze()
 
   def _forward_impl(self, x):
@@ -312,18 +213,15 @@ class VGGCaffePreTrained(PretrainNet):
     except FileNotFoundError as e:
       print(ERROR, "weights_path:", weights_path,
             'does not exits!, if you want to training must download pretrained weights')
+    mean = torch.tensor([103.939, 116.779, 123.68])[None, :, None, None]
+    self.register_buffer('mean', mean)
+    self.vgg_normalize = lambda x: x - self.mean
 
   def _process(self, x):
     # NOTE 图像范围为[-1~1]，先denormalize到0-1再归一化
     rgb = denormalize(x) * 255  # to 255
     bgr = rgb[:, [2, 1, 0], :, :]  # rgb to bgr
     return self.vgg_normalize(bgr)  # vgg norm
-
-  def setup(self, device: torch.device):
-    mean: torch.Tensor = torch.tensor([103.939, 116.779, 123.68], device=device)
-    mean = mean[None, :, None, None]
-    self.vgg_normalize = lambda x: x - mean
-    # self.freeze()
 
   def _forward_impl(self, x):
     x = self._process(x)

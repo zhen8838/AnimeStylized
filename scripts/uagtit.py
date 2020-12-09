@@ -1,20 +1,28 @@
 import os
 import sys
 sys.path.insert(0, os.getcwd())
-from networks.gan import ResnetGenerator, AttentionDiscriminator, RhoClipper, WClipper
+from networks.gan import RhoClipper, WClipper
+from networks import get_network
 from networks.pretrainnet import FacePreTrained
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
+from torch.nn.functional import interpolate
 from typing import Dict, Tuple
 from datamodules.uagtitds import UagtitGanDataSet
 from scripts.common import run_common, log_images
+from utils.color_map import ColorMap
 import itertools
 from scripts.whiteboxgan import infer_fn
+import numpy as np
+import cv2
 
 
 class UagtitGAN(pl.LightningModule):
   def __init__(self,
+               generator: dict,
+               discriminatorG: dict,
+               discriminatorL: dict,
                lr: float = 0.0001,
                adv_weight: float = 1,
                cycle_weight: float = 50,
@@ -23,18 +31,20 @@ class UagtitGAN(pl.LightningModule):
                faceid_weight: float = 1,
                rho_clipper: float = 1,
                w_clipper: float = 1,
+               n_layers: float = 7,
                ch: float = 32,
-               light: bool = True
+               light: bool = True,
                ) -> None:
     super().__init__()
     self.save_hyperparameters()
-    self.genA2B = ResnetGenerator(ngf=ch, img_size=256, light=light)
-    self.genB2A = ResnetGenerator(ngf=ch, img_size=256, light=light)
-    self.disGA = AttentionDiscriminator(input_nc=3, ndf=ch, n_layers=7)
-    self.disGB = AttentionDiscriminator(input_nc=3, ndf=ch, n_layers=7)
-    self.disLA = AttentionDiscriminator(input_nc=3, ndf=ch, n_layers=5)
-    self.disLB = AttentionDiscriminator(input_nc=3, ndf=ch, n_layers=5)
+    self.genA2B = get_network(generator)
+    self.genB2A = get_network(generator)
+    self.disGA = get_network(discriminatorG)
+    self.disGB = get_network(discriminatorG)
+    self.disLA = get_network(discriminatorL)
+    self.disLB = get_network(discriminatorL)
     self.facenet = FacePreTrained('models/model_mobilefacenet.pth')
+    self.colormap = ColorMap('jet')
 
     self.Rho_clipper = RhoClipper(0, rho_clipper)
     self.W_Clipper = WClipper(0, w_clipper)
@@ -193,12 +203,44 @@ class UagtitGAN(pl.LightningModule):
       self.genB2A.apply(self.W_Clipper)
       return Generator_loss
 
+  def cam2img(self, x: torch.Tensor, size=256):
+    x = x - x.min()
+    cam_img = x / x.max()
+    cam_img = interpolate(cam_img, (size, size))
+    cam_img = (255 * cam_img).long()
+    cam_img = self.colormap(cam_img)
+    return (cam_img - .5) / .5
+
   def validation_step(self, batch, batch_idx):
     real_A, real_B = batch
     fake_A2B, _, fake_A2B_heatmap = self.genA2B(real_A)
-    # fake_A2B2A, _, fake_A2B2A_heatmap = self.genB2A(fake_A2B)
-    # fake_A2A, _, fake_A2A_heatmap = self.genB2A(real_A)
-    log_images(self, {'gen/A/fake_A2B': fake_A2B})
+    fake_A2B2A, _, fake_A2B2A_heatmap = self.genB2A(fake_A2B)
+    fake_A2A, _, fake_A2A_heatmap = self.genB2A(real_A)
+
+    fake_B2A, _, fake_B2A_heatmap = self.genB2A(real_B)
+    fake_B2A2B, _, fake_B2A2B_heatmap = self.genA2B(fake_B2A)
+    fake_B2B, _, fake_B2B_heatmap = self.genA2B(real_B)
+
+    log_images(self,
+               {'gen/A': torch.cat(
+                   (real_A,
+                    fake_A2A,
+                    self.cam2img(fake_A2A_heatmap),
+                    fake_A2B,
+                    self.cam2img(fake_A2B_heatmap),
+                    fake_A2B2A,
+                    self.cam2img(fake_A2B2A_heatmap)
+                    )),
+                'gen/B': torch.cat(
+                    (real_B,
+                     fake_B2B,
+                     self.cam2img(fake_B2B_heatmap),
+                     fake_B2A,
+                     self.cam2img(fake_B2A_heatmap),
+                     fake_B2A2B,
+                     self.cam2img(fake_B2A2B_heatmap)
+                     ))
+                }, num=28)
 
 
 if __name__ == "__main__":

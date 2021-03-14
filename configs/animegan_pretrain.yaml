@@ -1,5 +1,5 @@
 dataset:
-  root: "/home/lxy/zhengqihang/animedataset"
+  root: "/home/zqh/workspace/animedataset"
   style: "Hayao"
   batch_size: 8
   num_workers: 32
@@ -24,7 +24,7 @@ model:
   pretrained_name: VGGCaffePreTrained
 trainer:
   gpus: 1
-  max_epochs: 5
+  max_epochs: 2
   benchmark: True
   deterministic: True
   log_every_n_steps: 10

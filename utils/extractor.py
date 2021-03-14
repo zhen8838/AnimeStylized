@@ -12,6 +12,13 @@ class Extractor():
                extract_key: str,
                is_extract_tuple: bool = False,
                is_auto_stop: bool = True) -> None:
+    """ ectract any layer output by key
+
+    Args:
+        extract_key (str): str or list[str]
+        is_extract_tuple (bool, optional): weather return tuple. Defaults to False.
+        is_auto_stop (bool, optional): when all output extracted, weather stop forward. Defaults to True.
+    """
     super().__init__()
     self.extract_key = extract_key
     self.is_auto_stop = is_auto_stop
@@ -28,7 +35,8 @@ class Extractor():
       output_keys = [self.extract_key]
     else:
       # NOTE remove duplicate key
-      output_keys = list(set(self.extract_key))
+      seen = set()
+      output_keys = [x for x in self.extract_key if not (x in seen or seen.add(x))]
 
     # add hook
     extracted_features = {}

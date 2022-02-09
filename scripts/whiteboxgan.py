@@ -83,9 +83,16 @@ class ColorShift(nn.Module):
           torch.tensor((0.199, 0.487, 0.014), device=device),
           torch.tensor((0.399, 0.687, 0.214), device=device))
 
-  def forward(self, *img: torch.Tensor) -> Tuple[torch.Tensor]:
-    rgb = self.dist.sample()
-    return ((im * rgb[None, :, None, None]) / rgb.sum() for im in img)
+  #Allow taking mutiple images batches as input
+  #So we can do: gray_fake, gray_cartoon = ColorShift(output, input_cartoon)
+  def forward(self, *image_batches: torch.Tensor) -> Tuple[torch.Tensor]:
+    # Sample the random color shift coefficients
+    weights = self.dist.sample()
+
+    # images * weights[None, :, None, None] => Apply weights to r,g,b channels of each images
+    # torch.sum(, dim=1) => Sum along the channels so (B, 3, H, W) become (B, H, W)
+    # .unsqueeze(1) => add back the channel so (B, H, W) become (B, 1, H, W)
+    return ((((torch.sum(images * weights[None, :, None, None], dim= 1)) / weights.sum()).unsqueeze(1)) for images in image_batches)
 
 
 class VariationLoss(nn.Module):
